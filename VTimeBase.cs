@@ -49,10 +49,10 @@ namespace 破片压缩器 {
         public AutoResetEvent event计算 = new AutoResetEvent(false);
         public AutoResetEvent reset再次获取 = new AutoResetEvent(false);
 
-        bool b读取关键帧 = false, b读取转场 = false, b读取黑场 = false, b读取白场 = false;
+        bool b读取关键帧 = false, b读取转场 = false, b读取黑场 = false, b读取白场 = false,b正在计算=true;
 
         string path输出目录关键帧时间戳, path输出目录转场时间戳, path输出目录黑场时间戳, path输出目录白场时间戳;
-        
+
 
         public class Span偏移 {
             public int i分段号;
@@ -165,7 +165,7 @@ namespace 破片压缩器 {
                         }
                     }
                     var dicSort_Sec = from objDic in dic_分段_偏移 orderby objDic.Value.f持续秒 descending select objDic;
-                    foreach (var item in dicSort_Sec) lock(obj读取文件号) set体积降序编码序列.Add(item.Key);//按时长排序添加
+                    foreach (var item in dicSort_Sec) lock (obj读取文件号) set体积降序编码序列.Add(item.Key);//按时长排序添加
                     return true;
                 }
             }
@@ -322,11 +322,10 @@ namespace 破片压缩器 {
 
         readonly object obj读取文件号 = new object( );
         public bool hasNext_序列Span偏移(DirectoryInfo di编码成功, out Span偏移 span偏移, out int i剩余) {
-
             再次检查:
             while (set体积降序编码序列.Count > 0) {
                 int n;
-                lock(obj读取文件号) n= set体积降序编码序列.First( );
+                lock (obj读取文件号) n = set体积降序编码序列.First( );
                 if (File.Exists($"{di编码成功.FullName}\\{n}.mkv")) {//检查并绕过已有任务
                     lock (obj读取文件号) {
                         set体积降序编码序列.Remove(n);
@@ -335,7 +334,7 @@ namespace 破片压缩器 {
                 } else { break; }
             }
 
-            while (set体积降序编码序列.Count < 1 && th循环计算.IsAlive) {//如果没有等待转码，，并且扫描线程还在工作则无限等待
+            while (set体积降序编码序列.Count < 1 && b正在计算) {//如果没有等待转码，，并且扫描线程还在工作则无限等待
                 reset再次获取.WaitOne(666);
                 event计算.Set( );
                 if (set体积降序编码序列.Count > 0) goto 再次检查; //延迟后，新计算出的分段需再次检查文件已存在。
@@ -410,21 +409,19 @@ namespace 破片压缩器 {
         }
         void fx添加结尾(float secMin, ref int index转场, ref List<float> list分段秒) {
             do {
-                int start = index转场;
-                for (; start < list转场.Count; start++) {
-                    if (list转场[start] >= secMin) {
+                for (; index转场 < list转场.Count; index转场++) {
+                    if (list转场[index转场] >= secMin) {
                         break;
                     } else {
-                        if (list转场[start] > list分段秒.Last( ) + sec_gop * 6) {
-                            list分段秒.Add(list转场[start]);
-                            secMin = list转场[start] + sec分割至少;
-                            index转场 = start + 1;
+                        if (list转场[index转场] > list分段秒.Last( ) + sec_gop * 6) {
+                            list分段秒.Add(list转场[index转场]);
+                            secMin = list转场[index转场] + sec分割至少;
                         }
                     }
                 }
-                if (start > 0 && start < list转场.Count) { //list转场[0]=0帧起手，list转场[length-1] 可以是最后一场
-                    int end = start + 1;
-                    float sec_gop_end = list转场[start] + sec_gop * 6;
+                if (index转场 > 0 && index转场 < list转场.Count) { //list转场[0]=0帧起手，list转场[length-1] 可以是最后一场
+                    int end = index转场 + 1;
+                    float sec_gop_end = list转场[index转场] + sec_gop * 6;
                     for (; end < list转场.Count; end++) {
                         if (list转场[end] > sec_gop_end) {
                             end--; break;//结束范围必须小于等于最大秒或者末尾。
@@ -432,10 +429,10 @@ namespace 破片压缩器 {
                     }
 
                     if (end < list转场.Count) {
-                        if (end > start) {
-                            int i最大画面方差 = start;
-                            double f最大画面方差 = dic转场帧[list转场[start]].d画面方差;
-                            for (int i = start + 1; i <= end; i++) {
+                        if (end > index转场) {
+                            int i最大画面方差 = index转场;
+                            double f最大画面方差 = dic转场帧[list转场[index转场]].d画面方差;
+                            for (int i = index转场 + 1; i <= end; i++) {
                                 double f画面方差 = dic转场帧[list转场[i]].d画面方差;
                                 if (f画面方差 > f最大画面方差) {
                                     f最大画面方差 = f画面方差;
@@ -443,22 +440,20 @@ namespace 破片压缩器 {
                                 }
                             }
                             list分段秒.Add(list转场[i最大画面方差]);
-                            secMin = list转场[start] + sec分割至少;
+                            secMin = list转场[index转场] + sec分割至少;
                             index转场 = i最大画面方差 + 1;
-                        } else if (end == start) {
-                            if (list转场[start] - list分段秒.Last( ) >= sec分割至少) {
-                                list分段秒.Add(list转场[start]);//时段内只有一个镜头切换
+                        } else if (end == index转场) {
+                            if (list转场[index转场] - list分段秒.Last( ) >= sec分割至少) {
+                                list分段秒.Add(list转场[index转场]);//时段内只有一个镜头切换
                             }
-                            secMin = list转场[start] + sec分割至少;
-                            index转场 = start + 1;
+                            secMin = list转场[index转场] + sec分割至少;
                         } else
                             return;
                     } else {
-                        if (list转场[start] - list分段秒.Last( ) >= sec分割至少) {
-                            list分段秒.Add(list转场[start]);//时段内只有一个镜头切换
+                        if (list转场[index转场] - list分段秒.Last( ) >= sec分割至少) {
+                            list分段秒.Add(list转场[index转场]);//时段内只有一个镜头切换
                         }
-                        secMin = list转场[start] + sec分割至少;
-                        index转场 = start + 1;
+                        secMin = list转场[index转场] + sec分割至少;
                     }
                 }
             } while (index转场 < list转场.Count);
@@ -577,7 +572,6 @@ namespace 破片压缩器 {
                 }
 
                 if (!is扫描完成 && DateTime.Now.Subtract(timeStart).TotalMinutes > 1) {
-
                     fx匹配关键帧(ref index关键帧, ref list分段秒);
 
                     int i上次分段数 = dic_分段_偏移.Count;
@@ -739,8 +733,8 @@ namespace 破片压缩器 {
         }
         void fn扫白场( ) {
             span扫白场进度 = TimeSpan.Zero;
-            using (Process process = new Process( )) {
-                string cmd = $"{str单线程} -i \"{fi输入文件.FullName}\" -vf \"format=gray,geq=r='if(gt(R,250)&gt(G,250)&gt(B,250))',showinfo\" -f null -";
+            using (Process process = new Process( )) {                
+                string cmd = $"{str单线程} -i \"{fi输入文件.FullName}\" -vf \"signalstats,metadata=print:key=lavfi.signalstats.YAVG,duration_time\" - f null -";
                 process.StartInfo = get_StartInfo(EXE.ffmpeg, cmd);
                 try { process.Start( ); } catch {
                     return;
@@ -986,6 +980,7 @@ namespace 破片压缩器 {
                 dic黑场.Clear( );
                 dic白场.Clear( );
                 dic转场帧.Clear( );
+                b正在计算 = false;
             }
             try { File.WriteAllText(di输出目录.FullName + "\\无缓转码.csv", @string.ToString( )); } catch (Exception err) {
                 @string.AppendLine( ).Append(err.Message);

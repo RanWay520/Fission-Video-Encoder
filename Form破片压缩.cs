@@ -151,15 +151,17 @@ namespace 破片压缩器 {
                             if (!video.b解码60帧判断交错(out StringBuilder builder)) //扫描60帧，出结果较快。
                                 video.b读取视频头(out builder);
 
-                            if (!video.b查找MKA音轨( )) {
-                                add日志($"提取音轨：{video.strMKA文件名}");
-                                Task.Run(( ) => { video.b提取MKA音轨(ref builder); });//体积大的视频会等好几分钟
-                                if (!转码队列.b有任务) autoReset初始信息.Set( );
-                            }//mkvmerge小概率返回结果后，内存中的数据未完全写入磁盘。已增加命令行 --flush-on-close 完整写入磁盘退出
-
                             if (video.b无缓转码) {//有无缓转码.info文件时，代表未完成任务为无缓模式
+                                video.b查找MKA音轨( );
+                                add日志($"扫描视频帧数据：{file.Name}");
                                 fn无缓参数(video);
                             } else {
+                                if (!video.b查找MKA音轨( )) {
+                                    add日志($"提取音轨：{video.strMKA文件名}");
+                                    Task.Run(( ) => { video.b提取MKA音轨(ref builder); });//体积大的视频会等好几分钟
+                                    if (!转码队列.b有任务) autoReset初始信息.Set( );
+                                }//mkvmerge小概率返回结果后，内存中的数据未完全写入磁盘。已增加命令行 --flush-on-close 完整写入磁盘退出
+
                                 if (!video.b有切片记录) {//如果找不到现有切片，先进行切片。
                                     if (Settings.b扫描场景) {
                                         string log = "扫描关键帧差异，决定切片场景：" + file.Name;

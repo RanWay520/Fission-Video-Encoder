@@ -588,7 +588,6 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
             return false;
         }
         public bool b提取MKA音轨(ref StringBuilder builder) {
-
             if (!File.Exists(fi输入视频.FullName)) return false; //存在间隔时间，判断原始文件存在情况。
 
             string str日志文件 = $"提取音轨_{fi输入视频.Name}.log";
@@ -597,11 +596,9 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
             builder.AppendLine( ).AppendLine("提取MKA音轨：").Append(commamd);
             builder.AppendLine(commamd);
 
-            External_Process ep = new External_Process(mkvmerge, commamd, str切片路径, fi输入视频);
-            转码队列.process切片 = ep;
-            ep.sync_MKVmerge保存消息(str切片路径, str日志文件, out string[] logs, ref builder);
+            转码队列.process切片 = new External_Process(mkvmerge, commamd, str切片路径, fi输入视频); 
+            转码队列.process切片.sync_MKVmerge保存消息(str切片路径, str日志文件, out string[] logs, ref builder);
             转码队列.process切片 = null;
-
 
             if (File.Exists(str完整路径MKA)) {
                 fiMKA = new FileInfo(str完整路径MKA);
@@ -843,7 +840,7 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
             return list_切片体积降序.Count > 0;
         }
 
-        public bool b后台转码MKA音轨( ) {
+        public bool b后台转码MKA音轨( ) {//在切片环节启动的转码音轨，用于视频转码完成，等待音频转码完成合并。
             if (info.list音频轨.Count > 0 && _b_opus && !_b音轨同时切片) {//转码opus时，可以不分解mka文件
                 if (fiMKA != null && File.Exists(fiMKA.FullName)) {
                     str音频摘要 = ".opus";
@@ -867,26 +864,64 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
 
                     str音频摘要 += $".{Settings.i音频码率}k";
 
-                    fiOPUS = new FileInfo($"{fiMKA.DirectoryName}\\转码音轨{str音频摘要}\\{fiMKA.Name}");
+                    fiOPUS = new FileInfo($"{fiMKA.DirectoryName}\\转码音轨{str音频摘要}\\opus.mka");
                     if (!fiOPUS.Exists) {
-                        string str临时文件 = $"临时{str音频摘要}丨{DateTime.Now:yyyy.MM.dd.HH.mm.ss.fff}.mka";
-                        builder.AppendFormat(" -metadata encoding_tool=\"{0} {1}\" \"{2}\" ", Application.ProductName, Application.ProductVersion, str临时文件);
+                        fiOPUS = new FileInfo($"{di切片}\\临时{str音频摘要}丨{DateTime.Now:yyyy.MM.dd.HH.mm.ss.fff}.mka");
+                        builder.AppendFormat(" -metadata encoding_tool=\"{0} {1}\" \"{2}\" ", Application.ProductName, Application.ProductVersion, fiOPUS.FullName);
 
                         External_Process external_Process = new External_Process(ffmpeg, builder.ToString( ), fiMKA);
-                        external_Process.fi编码 = new FileInfo($"{fiMKA.DirectoryName}\\{str临时文件}");
-                        external_Process.di编码成功 = new DirectoryInfo($"{fiMKA.DirectoryName}\\转码音轨{str音频摘要}");
+                        external_Process.fi编码 = fiOPUS;
+                        external_Process.di编码成功 = new DirectoryInfo($"{di切片.FullName}\\转码音轨{str音频摘要}");
 
-                        th音频转码 = new Thread(new ParameterizedThreadStart(fn_音频转码成功信号));
-                        th音频转码.IsBackground = true;
+                        th音频转码 = new Thread(new ParameterizedThreadStart(fn_音频转码成功信号)) { IsBackground = true };
                         th音频转码.Start(external_Process); //避免音频比视频后出结果，额外开一条等待线程，完成时触发b音轨转码成功布尔值。
                         return true;
-                    } else
+                    } else { 
                         b音轨已转码 = true;//文件存在直接标记
+                        Form破片压缩.autoReset合并.Set( );
+                    }
+                } else if ( File.Exists(fi输入视频.FullName)) {
+                    str音频摘要 = ".opus";
+                    StringBuilder builder = new StringBuilder(EXE.ffmpeg单线程);
+
+                    builder.Append(" -i \"").Append(fi输入视频.FullName).Append('"');
+                    builder.Append(" -vn -map 0:a -c:a libopus -vbr on -compression_level 10");//忽略视频轨道，转码全部音轨，字幕轨可能会保留一条。
+                    //builder.Append(" -map 0:a:0 -c:a libopus -vbr on -compression_level 10"); //只保留一条音轨
+                    //builder.Append(" -c:a libopus -vbr 2.0 -compression_level 10");//vbr 0~2;//vbr不太好用
+
+                    if (Settings.i音频码率 == 96 && Settings.i声道 == 0) {
+                        //opus默认码率每声道48K码率。多声道自动计算方便。
+                    } else
+                        builder.Append(" -b:a ").Append(Settings.i音频码率).Append('k');
+
+                    if (Settings.i声道 > 0) {
+                        builder.Append(" -ac ").Append(Settings.i声道);
+                        str音频摘要 += $"{Settings.i声道}.0";
+                    }
+
+                    str音频摘要 += $".{Settings.i音频码率}k";
+
+                    fiOPUS = new FileInfo($"{di切片.FullName}\\转码音轨{str音频摘要}\\opus.mka");
+                    if (!fiOPUS.Exists) {
+                        fiOPUS = new FileInfo($"{di切片}\\临时{str音频摘要}丨{DateTime.Now:yyyy.MM.dd.HH.mm.ss.fff}.mka");
+                        builder.AppendFormat(" -metadata encoding_tool=\"{0} {1}\" \"{2}\" ", Application.ProductName, Application.ProductVersion, fiOPUS.FullName);
+
+                        External_Process external_Process = new External_Process(ffmpeg, builder.ToString( ), fi输入视频);
+                        external_Process.fi编码 = fiOPUS;
+                        external_Process.di编码成功 = new DirectoryInfo($"{di切片.FullName}\\转码音轨{str音频摘要}");
+
+                        th音频转码 = new Thread(new ParameterizedThreadStart(fn_音频转码成功信号)) { IsBackground = true };
+                        th音频转码.Start(external_Process); //避免音频比视频后出结果，额外开一条等待线程，完成时触发b音轨转码成功布尔值。
+                        return true;
+                    } else {
+                        b音轨已转码 = true;//文件存在直接标记
+                        Form破片压缩.autoReset合并.Set( );
+                    }
                 }
             }
             return false;
         }
-        public bool b更新OPUS音轨( ) {
+        public bool b更新OPUS音轨( ) {//在合并环节启动，视频没完成之前，音频码率可以热修改。
             if (fiMKA == null || !File.Exists(fiMKA.FullName)) {//任务穿插进视频转码全过程，可能出现音轨被删除、视频被删除的情况。
                 if (File.Exists(fi输入视频.FullName))
                     fiMKA = fi输入视频;
@@ -916,20 +951,21 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
             string str临时文件 = $"{di切片.FullName}\\临时{str音频摘要}丨{DateTime.Now:yyyy.MM.dd.HH.mm.ss.fff}.mka";//绝对目录输出音轨
             builder.AppendFormat(" -metadata encoding_tool=\"{0} {1}\" \"{2}\" ", Application.ProductName, Application.ProductVersion, str临时文件);
 
-            External_Process external_Process = new External_Process(ffmpeg, builder.ToString( ), fiMKA);
-            转码队列.process音轨 = external_Process;
-            external_Process.sync_FFmpegInfo(out List<string> list);//音轨转码线程不占用队列。会超出cpu核心数。
+            External_Process ep = new External_Process(ffmpeg, builder.ToString( ), fiMKA);
+            转码队列.process音轨 = ep;
+            ep.sync_FFmpegInfo(out List<string> list);//音轨转码线程不占用队列。会超出cpu核心数。
             转码队列.process音轨 = null;
 
             FileInfo fi临时音轨 = new FileInfo(str临时文件);
-            if (external_Process.b安全退出 && fi临时音轨.Exists) {
+            if (ep.b安全退出 && fi临时音轨.Exists) {
                 FileInfo fi成功音轨 = new FileInfo($"{di切片.FullName}\\转码音轨{Settings.opus摘要}\\opus.mka");
                 try { fi成功音轨.Directory.Create( ); } catch { return false; }
                 try { fi临时音轨.MoveTo(fi成功音轨.FullName); } catch { return false; }
                 fiOPUS = fi成功音轨;
-                str最终格式 = ".webm";
+                str最终格式 = info.OUT.str视流格式 == "av1" ? ".webm" : ".mkv";
                 return File.Exists(fiOPUS.FullName);
-            }
+            }else
+                
 
             b音轨已转码 = true;//尝试转码过也标记为真，不论成功失败。
             return false;
@@ -1028,13 +1064,21 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
             External_Process external_Process = (External_Process)obj;
             StringBuilder builder = new StringBuilder( );
             转码队列.process音轨 = external_Process;
+
             if (external_Process.sync( )) {//音轨转码线程不占用队列。会超出cpu核心数。
-                str最终格式 = info.OUT.str视流格式 == "av1" ? ".webm" : ".mkv";
-            }
-            转码队列.process音轨 = null;
+                转码队列.process音轨 = null;
+                FileInfo fi临时音轨 = external_Process.fi编码;
+                if (fi临时音轨.Exists) {
+                    FileInfo fi成功音轨 = new FileInfo($"{external_Process.di编码成功}\\opus.mka");
+                    try { fi成功音轨.Directory.Create( ); } catch { return; }
+                    try { fi临时音轨.MoveTo(fi成功音轨.FullName); } catch { return; }
+                    fiOPUS = fi成功音轨;
+                    str最终格式 = info.OUT.str视流格式 == "av1" ? ".webm" : ".mkv";
+                }
+            } else
+                转码队列.process音轨 = null;
 
             b音轨已转码 = true;//转码过后不论成功失败标记为已转码。
-
             if (!b文件夹下还有切片) Form破片压缩.autoReset合并.Set( );//有时音频转码速度比视频转码慢。
         }
 

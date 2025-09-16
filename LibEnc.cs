@@ -559,8 +559,9 @@ namespace 破片压缩器 {
             if (!dic_选择_预设.TryGetValue(key选择预设, out 预设 enc预设)) {
                 enc预设 = dic_选择_预设[_key显示预设];
             }
-            info.OUT.str量化名 = CRF参数.name;
+            info.OUT.str视流格式 = code;
             info.OUT.preset = enc预设.value;
+            info.OUT.str量化名 = CRF参数.name;
 
             if (b微调CRF && !b多线程 && !_b多线程优先) crf++;
 
