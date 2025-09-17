@@ -49,7 +49,7 @@ namespace 破片压缩器 {
         public AutoResetEvent event计算 = new AutoResetEvent(false);
         public AutoResetEvent reset再次获取 = new AutoResetEvent(false);
 
-        bool b读取关键帧 = false, b读取转场 = false, b读取黑场 = false, b读取白场 = false,b正在计算=true;
+        bool b读取关键帧 = false, b读取转场 = false, b读取黑场 = false, b读取白场 = false, b正在计算 = true;
 
         string path输出目录关键帧时间戳, path输出目录转场时间戳, path输出目录黑场时间戳, path输出目录白场时间戳;
 
@@ -183,15 +183,15 @@ namespace 破片压缩器 {
 
             int x黑度 = 98, x像素黑阈 = 32, x白度 = 98, x像素白阈 = 250;
 
-            path输出目录关键帧时间戳 = di输出目录.FullName + "\\关键帧时间戳.txt";
-            path输出目录转场时间戳 = di输出目录.FullName + $"\\检测镜头({scene:F3}).txt";
-            path输出目录黑场时间戳 = di输出目录.FullName + $"\\检测黑场({x黑度},{x像素黑阈}).txt";
-            path输出目录白场时间戳 = di输出目录.FullName + $"\\检测白场({x白度},{x像素白阈}).txt";
+            path输出目录关键帧时间戳 = di输出目录.FullName + "\\关键帧时间戳.info";
+            path输出目录转场时间戳 = di输出目录.FullName + $"\\检测镜头({scene:F3}).info";
+            path输出目录黑场时间戳 = di输出目录.FullName + $"\\检测黑场({x黑度},{x像素黑阈}).info";
+            path输出目录白场时间戳 = di输出目录.FullName + $"\\检测白场({x白度},{x像素白阈}).info";
 
             TimeSpan span = TimeSpan.Zero;
             b读取关键帧 = is成功读取(ref list关键帧, "关键帧", path输出目录关键帧时间戳, ref span);
             if (!b读取关键帧) {
-                string path视频同目录关键帧时间戳 = $"{fi输入文件.DirectoryName}\\关键帧时间戳_{fi输入文件.Name}.txt";
+                string path视频同目录关键帧时间戳 = $"{fi输入文件.DirectoryName}\\关键帧时间戳_{fi输入文件.Name}.info";
                 b读取关键帧 = is成功读取(ref list关键帧, "关键帧", path视频同目录关键帧时间戳, ref span);
 
                 if (!b读取关键帧) {
@@ -202,7 +202,7 @@ namespace 破片压缩器 {
 
             b读取转场 = is成功读取(ref list转场, "转场", path输出目录转场时间戳, ref span扫转场进度);
             if (!b读取转场) {
-                string path视频同目录转场时间戳 = $"{fi输入文件.DirectoryName}\\检测镜头({scene:F3}).{fi输入文件.Name}.txt";
+                string path视频同目录转场时间戳 = $"{fi输入文件.DirectoryName}\\检测镜头({scene:F3}).{fi输入文件.Name}.info";
                 b读取转场 = is成功读取(ref list转场, "转场", path视频同目录转场时间戳, ref span扫转场进度);
                 if (!b读取转场) {
                     th扫转场 = new Thread(fn扫转场) { IsBackground = true, Name = "扫转场" };
@@ -212,7 +212,7 @@ namespace 破片压缩器 {
 
             b读取黑场 = is成功读取(ref list黑场, "黑场", path输出目录黑场时间戳, ref span扫黑场进度);
             if (!b读取黑场) {
-                string path视频同目录黑场时间戳 = $"{fi输入文件.DirectoryName}\\检测黑场({x黑度},{x像素黑阈}).{fi输入文件.Name}.txt";
+                string path视频同目录黑场时间戳 = $"{fi输入文件.DirectoryName}\\检测黑场({x黑度},{x像素黑阈}).{fi输入文件.Name}.info";
                 b读取黑场 = is成功读取(ref list黑场, "黑场", path视频同目录黑场时间戳, ref span扫黑场进度);
                 if (!b读取黑场) {
                     th扫黑场 = new Thread(fn扫黑场) { IsBackground = true, Name = "扫黑场" };
@@ -222,7 +222,7 @@ namespace 破片压缩器 {
 
             //b读取白场 = is成功读取(ref list白场, "白场", path输出目录白场时间戳, ref span扫白场进度);
             //if (!b读取白场) {
-            //    string path视频同目录白场时间戳 = $"{fi输入文件.DirectoryName}\\检测白场({x白度},{x像素白阈}).{fi输入文件.Name}.txt";
+            //    string path视频同目录白场时间戳 = $"{fi输入文件.DirectoryName}\\检测白场({x白度},{x像素白阈}).{fi输入文件.Name}.info";
             //    b读取白场 = is成功读取(ref list白场, "白场", path视频同目录白场时间戳, ref span扫黑场进度);
             //    if (!b读取白场) {
             //        th扫白场 = new Thread(fn扫白场) { IsBackground = true };
@@ -245,7 +245,7 @@ namespace 破片压缩器 {
             TimeSpan span = TimeSpan.Zero;
             b读取关键帧 = is成功读取(ref list关键帧, "关键帧", path输出目录关键帧时间戳, ref span);
             if (!b读取关键帧) {
-                string path视频同目录关键帧时间戳 = fi输入文件.FullName + "_关键帧时间戳.txt";
+                string path视频同目录关键帧时间戳 = fi输入文件.FullName + "_关键帧时间戳.info";
                 b读取关键帧 = is成功读取(ref list关键帧, "关键帧", path视频同目录关键帧时间戳, ref span);
                 if (!b读取关键帧) {
                     th扫关键帧 = new Thread(fn扫关键帧) { IsBackground = true, Name = "扫关键帧" };
@@ -530,7 +530,7 @@ namespace 破片压缩器 {
                 if (th扫关键帧 != null && th扫关键帧.IsAlive) event计算.WaitOne(666);
                 int count = dic_分段_偏移.Count;
                 for (; i < list关键帧.Count; i++) {
-                    if (list关键帧[i] - last > sec_gop) {
+                    if (list关键帧[i] - last >= sec_gop) {
                         int n = dic_分段_偏移.Count + 1;
                         if (dic_分段_偏移.TryAdd(n, new Span偏移(n, last, last, list关键帧[i], vinfo.f输入每帧秒))) {
                             last = list关键帧[i];
@@ -540,7 +540,6 @@ namespace 破片压缩器 {
                 if (dic_分段_偏移.Count - count > 0) {
                     if (转码队列.b允许入队) fx保存有序无缓转码csv(b完成: false);
                 }
-
             } while (list关键帧.Last( ) < Duration);
 
             fx保存有序无缓转码csv(b完成: true);
@@ -553,6 +552,8 @@ namespace 破片压缩器 {
             List<float> list分段秒 = new List<float>( ) { 0 };
             float f后6组 = 0;
             do {
+                while (转码队列.b队列满 && set体积降序编码序列.Count > 0) event计算.WaitOne(666);//正在转码的情况直接等待扫描结果，减少异步计算分段异常
+
                 f后6组 += sec_gop * 6;//每轮
                 for (float sec一打GOP = f后6组 + sec_gop * 6; !is扫描完成 && getSpan最慢 <= sec一打GOP;) event计算.WaitOne(6666);//缓冲跨步时长12组。
 
@@ -628,7 +629,7 @@ namespace 破片压缩器 {
                     @string.AppendLine("安全退出");
                     string txt = @stringErr.AppendLine( ).Append(@string).ToString( );
 
-                    string path视频同目录关键帧时间戳 = fi输入文件.FullName + "_关键帧时间戳.txt";
+                    string path视频同目录关键帧时间戳 = fi输入文件.FullName + "_关键帧时间戳.info";
                     //try { File.WriteAllText(path视频同目录关键帧时间戳, txt); } catch { }//调试禁用
                     try { File.WriteAllText(path输出目录关键帧时间戳, txt); } catch { }
                 }
@@ -652,7 +653,7 @@ namespace 破片压缩器 {
                     else @stringError.AppendLine(StandardError);
                 }
 
-                string path视频同目录时间戳 = fi输入文件.FullName + "_转场帧时间戳.txt";
+                string path视频同目录时间戳 = fi输入文件.FullName + "_转场帧时间戳.info";
                 if (!process.HasExited) {
                     str扫转场 = DateTime.Now + "……";
                     process.PriorityClass = ProcessPriorityClass.Idle;
@@ -700,7 +701,7 @@ namespace 破片压缩器 {
                     else @stringError.AppendLine(StandardError);
                 }
 
-                string path视频同目录时间戳 = fi输入文件.FullName + "_黑场时间戳.txt";
+                string path视频同目录时间戳 = fi输入文件.FullName + "_黑场时间戳.info";
                 if (!process.HasExited) {
                     str扫黑场 = DateTime.Now + "……";
                     process.PriorityClass = ProcessPriorityClass.BelowNormal;
@@ -733,7 +734,7 @@ namespace 破片压缩器 {
         }
         void fn扫白场( ) {
             span扫白场进度 = TimeSpan.Zero;
-            using (Process process = new Process( )) {                
+            using (Process process = new Process( )) {
                 string cmd = $"{str单线程} -i \"{fi输入文件.FullName}\" -vf \"signalstats,metadata=print:key=lavfi.signalstats.YAVG,duration_time\" - f null -";
                 process.StartInfo = get_StartInfo(EXE.ffmpeg, cmd);
                 try { process.Start( ); } catch {
@@ -747,7 +748,7 @@ namespace 破片压缩器 {
                     else @stringError.AppendLine(StandardError);
                 }
 
-                string path视频同目录时间戳 = fi输入文件.FullName + "_白场时间戳.txt";
+                string path视频同目录时间戳 = fi输入文件.FullName + "_白场时间戳.info";
                 if (!process.HasExited) {
                     str扫白场 = DateTime.Now + "……";
                     process.PriorityClass = ProcessPriorityClass.BelowNormal;

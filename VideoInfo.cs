@@ -48,6 +48,7 @@ namespace 破片压缩器 {
         public static Regex regex隔行扫描 = new Regex(@"(top|bottom)\s+first", RegexOptions.IgnoreCase | RegexOptions.Compiled);//交错视频
 
         public 输出 OUT = new 输出( );
+        public 输入 IN = new 输入( );
         public 剪裁参数 黑边剪裁 = new 剪裁参数( );
         public 剪裁参数 手动剪裁 = new 剪裁参数( );
 
@@ -171,8 +172,10 @@ namespace 破片压缩器 {
 
         public class 输出 {
             public float adjust_crf = 0;
-
-            public string enc=string.Empty, str量化名="crf", preset = string.Empty, str视流格式 = string.Empty, denoise = string.Empty;
+            public string  enc=string.Empty, str量化名="crf", preset = string.Empty, str视流格式 = string.Empty, denoise = string.Empty;
+        }
+        public class 输入 {
+            public string ffmpeg单线程解码 = EXE.ffmpeg单线程解码;
         }
 
         public VideoInfo(FileInfo fileInfo) {

@@ -12,6 +12,8 @@ namespace 破片压缩器 {
         public static int i切片缓存 = 0;
 
         public static int i物理核心数 = 8;
+        public static int i逻辑核心数 = 16;
+
         public static int[] arr_核心号调度排序 = null;
         public static IntPtr[] arr_单核指针 = null;
 
@@ -51,36 +53,6 @@ namespace 破片压缩器 {
             }
         }
 
-
-        static void Fx统计平均速度(External_Process p) {
-            uint encodingFrames = 0;
-            lock (obj增删排锁) {
-                for (int i = 0; i < list.Count; i++) {
-                    if (list[i].HasFrame(out uint f)) {//进程退出时触发，p已从list移除，无需判断
-                        encodingFrames += f;//正在编码的帧量求和，计算更准确的平均速度。
-                    }
-                }
-            }
-            if (p.b安全退出) {
-                if (p.HasFrame(out uint f)) {
-                    ul累计完成帧 += f;
-                    totalFileKbit += p.fi编码.Length / 1024.0f * 8;//fi编码.Length=文件体积byte，×8换算为bit；
-
-                    totalVideoSeconds += p.span输入时长.TotalSeconds;
-
-                    double avg_vfr2tbr = ul累计完成帧 / totalVideoSeconds;// tbr (Time Base Rate)
-                    double avgKbps = totalFileKbit / totalVideoSeconds;
-                    double avgFps = (ul累计完成帧 + encodingFrames) * 1000.0f / stopwatch.ElapsedMilliseconds;
-
-                    if (dic_切片路径_剩余.ContainsKey(p.di输出文件夹.FullName)) {
-                        dic_切片路径_剩余[p.di输出文件夹.FullName]--;
-                    }
-
-                    strPast = $"  已压[{ul累计完成帧}帧÷{totalVideoSeconds:F0}秒={avg_vfr2tbr:F2}(tbr)]  平均编码效率[{avgFps:F5}fps @ {avgKbps:F0}Kbps]";
-                }
-            }
-        }
-
         public static bool ffmpeg等待入队(External_Process p) {
             //while (list.Count >= i多进程数量) autoReset入队.WaitOne( );需外部实现指定0任务，等待入队功能。
             if (p.async_FFmpeg编码( )) {
@@ -103,7 +75,7 @@ namespace 破片压缩器 {
             return true;
         }
 
-        public static bool process主动移除结束(External_Process p) {
+        public static bool process移除结束(External_Process p) {
             int i进程数 = list.Count;
 
             bool success = false;
@@ -111,7 +83,27 @@ namespace 破片压缩器 {
                 success = list.Remove(p);//移除成功，队列计数会比进程数小1.
             }
             if (success) {//移除队列可以 在编码数据流停止&进程未退出 触发。b安全退出未标记就触发统计
-                Fx统计平均速度(p);
+                uint encodingFrames = 0;
+                lock (obj增删排锁) {
+                    for (int i = 0; i < list.Count; i++) {
+                        if (list[i].HasFrame(out uint f)) {//进程退出时触发，p已从list移除，无需判断
+                            encodingFrames += f;//正在编码的帧量求和，计算更准确的平均速度。
+                        }
+                    }
+                }
+                if (p.b安全退出) {
+                    if (p.HasFrame(out uint f)) {
+                        ul累计完成帧 += f;
+                        totalFileKbit += p.fi编码.Length / 1024.0f * 8;//fi编码.Length=文件体积byte，×8换算为bit；
+                        totalVideoSeconds += p.span输入时长.TotalSeconds;
+
+                        double avg_vfr2tbr = ul累计完成帧 / totalVideoSeconds;// tbr (Time Base Rate)
+                        double avgKbps = totalFileKbit / totalVideoSeconds;
+                        double avgFps = (ul累计完成帧 + encodingFrames) * 1000.0f / stopwatch.ElapsedMilliseconds;
+
+                        strPast = $"  已压[{ul累计完成帧}帧÷{totalVideoSeconds:F0}秒={avg_vfr2tbr:F2}(tbr)]  平均编码效率[{avgFps:F5}fps @ {avgKbps:F0}Kbps]";
+                    }
+                }
             }
 
             bool b等待入队 = autoReset入队.Set( );//移除、增加转码队列，在文件处理逻辑之前，合并信号由文件处理线程发起。

@@ -253,8 +253,6 @@ namespace 破片压缩器 {
                 lock (obj合并队列) {
                     dic_完成路径_等待合并.Add(lowPath, roadmap);
                 }
-                if (roadmap.watcher编码成功文件夹 != null)//协编任务采用成功文件夹监控方式
-                    roadmap.watcher编码成功文件夹.Created += 新增成功视频检查合并;
             }
 
             Thread.Sleep(999); autoReset转码.Set( );//最快每秒开启一次扫描任务。
@@ -281,7 +279,7 @@ namespace 破片压缩器 {
                     video正在转码文件 = videoTemp;
                     str正在源文件夹 = video正在转码文件.str输入路径;
 
-                    timer刷新编码输出.Start( );
+                    this.Invoke(new Action(( ) => timer刷新编码输出.Start( )));//要委托UI线程启动计时器才能正确启动。
 
                     if (video正在转码文件.b后台转码MKA音轨( )) {//单独转码OPUS音轨，CPU资源占用少，放在视频队列之前。
                         add日志($"转码音轨：{video正在转码文件.strMKA路径}");
@@ -399,7 +397,7 @@ namespace 破片压缩器 {
             while (true) {
                 autoReset初始信息.WaitOne( );
                 Thread.Sleep(3333);
-                timer刷新编码输出.Stop( );
+                this.Invoke(new Action(( ) => timer刷新编码输出.Stop( )));
                 while (转码队列.Get独立进程输出(out string info)) {
                     if (转码队列.b有任务 && 转码队列.Has汇总输出信息(out string str编码速度)) {
                         info += "\r\n\r\n" + str编码速度;
@@ -413,7 +411,7 @@ namespace 破片压缩器 {
                     }
                     autoReset初始信息.WaitOne(3333);
                 }
-                timer刷新编码输出.Start( );
+                this.Invoke(new Action(( ) => timer刷新编码输出.Start( )));
             }
         }
 
@@ -439,21 +437,50 @@ namespace 破片压缩器 {
         }
 
         void CPUNum( ) {
+            try { 硬件.计算机名 = "主机：" + Environment.MachineName + " "; } catch { }
+
+            try {
+                foreach (var item in new ManagementObjectSearcher("Select * from Win32_ComputerSystem").Get( )) {
+                    try { NumberOfProcessors += int.Parse(item["NumberOfProcessors"].ToString( )); } catch { }
+                    try { NumberOfLogicalProcessors += int.Parse(item["NumberOfLogicalProcessors"].ToString( )); } catch { }
+                    try {
+                        if (double.TryParse(item["TotalPhysicalMemory"].ToString( ), out double memory)) {
+                            硬件.内存大小 = "内存：" + Math.Round(memory / 1024 / 1024 / 1024) + "GB\r\n";
+                        }
+                    } catch { }
+                }
+            } catch { }
+            try {
+                List<string> listCPU = new List<string>( );
+                foreach (var item in new ManagementObjectSearcher("Select * from Win32_Processor").Get( )) {
+                    NumberOfCores += int.Parse(item["NumberOfCores"].ToString( ));
+                    Encoding_Node.cpuId = item["ProcessorId"].ToString( );
+                    string name = item["Name"].ToString( ).Trim( ) + " ";
+                    if (!name.Contains("AMD") && !name.Contains("Intel")) {
+                        name = item["Manufacturer"].ToString( ) + " " + name;
+                    }
+                    listCPU.Add(name + "@" + item["CurrentClockSpeed"].ToString( ) + "MHz "
+                          + item["Version"].ToString( ).Trim( ) + " " + item["Processorid"].ToString( )); // 返回CPU名称，可能包含型号信息
+                }
+
+                for (int i = 1; i < listCPU.Count; i++)
+                    硬件.CPU名 += "\r\n" + listCPU[i];
+
+                listCPU.ForEach(item => 硬件.CPU名 += item + "\r\n");
+
+                if (NumberOfProcessors > 1)
+                    硬件.多路CPU = NumberOfProcessors + "路\r\n";
+
+            } catch { }
+
+            硬件.str摘要 = 硬件.计算机名 + 硬件.内存大小 + 硬件.多路CPU + 硬件.CPU名 + "\r\n";
+
             foreach (ManagementObject mo in new ManagementClass("Win32_BaseBoard").GetInstances( )) {
                 Encoding_Node.SerialNumber = mo.Properties["SerialNumber"].Value.ToString( );
                 break;
             }
-            foreach (var item in new ManagementObjectSearcher("Select * from Win32_ComputerSystem").Get( )) {
-                NumberOfProcessors += int.Parse(item["NumberOfProcessors"].ToString( ));
-            }
-            foreach (var item in new ManagementObjectSearcher("Select * from Win32_Processor").Get( )) {
-                NumberOfCores += int.Parse(item["NumberOfCores"].ToString( ));
-                Encoding_Node.cpuId = item["ProcessorId"].ToString( );
-            }
-            foreach (var item in new ManagementObjectSearcher("Select * from Win32_ComputerSystem").Get( )) {
-                NumberOfLogicalProcessors += int.Parse(item["NumberOfLogicalProcessors"].ToString( ));
-            }
             转码队列.i物理核心数 = NumberOfCores;
+            转码队列.i逻辑核心数 = NumberOfLogicalProcessors;
             add日志($"( {Encoding_Node.str主机名称} ) {NumberOfProcessors}处理器 {NumberOfCores}核心 {NumberOfLogicalProcessors}线程 [{Encoding_Node.cpuId}] {Encoding_Node.SerialNumber}");
 
 
@@ -698,7 +725,6 @@ namespace 破片压缩器 {
                         autoReset初始信息.Set( );
                         autoReset切片.Set( );
                         autoReset合并.Set( );
-
                     }
 
                     if (转码队列.Has汇总输出信息(out string str编码速度)) {
@@ -768,7 +794,6 @@ namespace 破片压缩器 {
             if (SelectedIndex == 0) {
                 i切片间隔秒 = Settings.sec_gop * 6;
                 Settings.b扫描场景 = true;
-                checkBox编码后删除切片.Visible = false;
                 numericUpDown_分割最小秒.Visible = numericUpDown检测镜头.Visible = true;
             } else if (SelectedIndex == 8) {
                 i切片间隔秒 = Settings.sec_gop * 3;
@@ -1092,11 +1117,9 @@ namespace 破片压缩器 {
         }
         private void textBox日志_Enter(object sender, EventArgs e) {
             timer刷新编码输出.Interval = 33333;
-            //if (timer刷新编码输出.Enabled) add日志("刷新输出信息间隔调整为30秒");
         }
         private void textBox日志_Leave(object sender, EventArgs e) {
             timer刷新编码输出.Interval = 8888;
-            //if (timer刷新编码输出.Enabled) add日志("刷新输出信息间隔调整为8秒");
         }
         private void Form破片压缩_Activated(object sender, EventArgs e) {
             timer刷新编码输出.Interval = 6666;
@@ -1112,13 +1135,6 @@ namespace 破片压缩器 {
                 add日志("刷新输出信息间隔调整为一分钟");
         }
         private void Form破片压缩_Load(object sender, EventArgs e) {
-
-            VideoInfo vinfo = new VideoInfo(new FileInfo("E:\\Videos\\2023情人节特辑.mp4"));
-            VTimeBase test = new VTimeBase(vinfo, new DirectoryInfo("D:\\破片转码\\Videos\\切片_2023情人节特辑.mp4"));
-
-            ////test.b读取无缓转码csv( );
-            //test.Start(false, 2, 0.2f);
-
             CPUNum( );
 
             comboBox_lib.SelectedIndex = 0;

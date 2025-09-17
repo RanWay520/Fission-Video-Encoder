@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
+
 namespace 破片压缩器 {
     internal class Encoding_Node {
         public static string cpuId = string.Empty, SerialNumber = string.Empty;
@@ -16,8 +17,8 @@ namespace 破片压缩器 {
             , str滤镜lavfi = string.Empty
             , str视频名无后缀 = string.Empty
             , str水印字体参数 = string.Empty
-            , str编码指令 = string.Empty, str多线程编码指令 = string.Empty
-            ;
+            , str编码指令 = string.Empty, str多线程编码指令 = string.Empty, ffmpeg单线程解码=string.Empty;
+            
 
         bool b切片序号水印 = false;
         public DirectoryInfo di切片文件夹;
@@ -62,6 +63,7 @@ namespace 破片压缩器 {
                         case "str滤镜lavfi": str滤镜lavfi = str值.Trim( ); break;
                         case "str编码指令": str编码指令 = str值.Trim( ); break;
                         case "str多线程编码指令": str多线程编码指令 = str值.Trim( ); break;
+                        case "info.IN.ffmpeg单线程解码": ffmpeg单线程解码 = str值.Trim( ); break;
                         case "b切片序号水印": b切片序号水印 = str值.ToLower( ) == "true"; break;
                         case "info.i输出宽": if (int.TryParse(str值, out int i宽)) i输出宽 = i宽; break;
                         case "info.str视频名无后缀=": str视频名无后缀 = str值.Trim( ); break;//不是必要参数，水印使用
@@ -173,16 +175,12 @@ namespace 破片压缩器 {
                 string str命令行;
 
                 if (Settings.b多线程)
-                    str命令行 = $"-hide_banner {EXE.ffmpeg单线程解码} -i {fi切片.Name} {str滤镜} {str多线程编码指令} \"{str编码后切片}\"";
+                    str命令行 = $"{ffmpeg单线程解码} -i {fi切片.Name} {str滤镜} {str多线程编码指令} \"{str编码后切片}\" {EXE.ffmpeg不显库}";
                 else {
-                    str命令行 = $"-hide_banner {EXE.ffmpeg单线程} -i {fi切片.Name} {str滤镜} {str编码指令} \"{str编码后切片}\"";
-                }
-
-                external_Process = new External_Process(ffmpeg, str命令行, fi切片);
-                external_Process.b单线程 = !Settings.b多线程;
-
+                    str命令行 = $"{EXE.ffmpeg单线程} -i {fi切片.Name} {str滤镜} {str编码指令} \"{str编码后切片}\" {EXE.ffmpeg不显库}";
+                } 
+                external_Process = new External_Process(ffmpeg, str命令行, !Settings.b多线程, name, fi切片, di编码成功);
                 external_Process.fi编码 = new FileInfo($"{fi切片.DirectoryName}\\{str编码后切片}");//fi切片设计为局域网编码时移动到另外文件夹，防止多机处理相同切片
-                external_Process.di编码成功 = di编码成功;
                 return true;
             } else
                 external_Process = null;

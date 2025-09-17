@@ -955,21 +955,21 @@
             this.comboBox切片模式.Dock = System.Windows.Forms.DockStyle.Top;
             this.comboBox切片模式.FormattingEnabled = true;
             this.comboBox切片模式.Items.AddRange(new object[] {
-            "ffmpeg扫描转场帧切割",
-            "以间隔5秒左右分割",
-            "以间隔10秒左右分割",
-            "以间隔30秒左右分割",
-            "以间隔1分钟左右分割",
-            "以间隔3分钟左右分割",
-            "以间隔5分钟左右分割",
-            "以间隔10分钟左右分割",
-            "无缓分段转码→ffmpeg扫描转场",
-            "无缓分段转码→按6倍跃秒GOP"});
+            "ffmpeg扫描转场切割，可协同编码",
+            "以间隔5秒左右切割，可协同编码",
+            "以间隔10秒左右切割，可协同编码",
+            "以间隔30秒左右切割，可协同编码",
+            "以间隔1分钟左右切割，可协同编码",
+            "以间隔3分钟左右切割，可协同编码",
+            "以间隔5分钟左右切割，可协同编码",
+            "以间隔10分钟左右切割，可协同编码",
+            "单机分段编码→ffmpeg扫描转场",
+            "单机分段编码→按6倍跃秒GOP"});
             this.comboBox切片模式.Location = new System.Drawing.Point(0, 0);
             this.comboBox切片模式.Name = "comboBox切片模式";
             this.comboBox切片模式.Size = new System.Drawing.Size(224, 32);
             this.comboBox切片模式.TabIndex = 1;
-            this.comboBox切片模式.Text = "ffmpeg扫描转场帧切割";
+            this.comboBox切片模式.Text = "ffmpeg扫描转场帧切割编码";
             this.comboBox切片模式.SelectedIndexChanged += new System.EventHandler(this.comboBox切片模式_SelectedIndexChanged);
             // 
             // numericUpDown检测镜头
@@ -1042,6 +1042,8 @@
             // checkBox编码后删除切片
             // 
             this.checkBox编码后删除切片.AutoSize = true;
+            this.checkBox编码后删除切片.Checked = true;
+            this.checkBox编码后删除切片.CheckState = System.Windows.Forms.CheckState.Checked;
             this.checkBox编码后删除切片.Dock = System.Windows.Forms.DockStyle.Top;
             this.checkBox编码后删除切片.Location = new System.Drawing.Point(0, 0);
             this.checkBox编码后删除切片.Name = "checkBox编码后删除切片";

@@ -511,6 +511,7 @@ namespace 破片压缩器 {
                 if (!string.IsNullOrEmpty(StandardError)) {
                     if (StandardError.IndexOf("frame=") >= 0) {
                         ffmpeg_Pace = StandardError;
+                        builder日志.Insert(0, 硬件.str摘要);
                         builder日志.AppendLine(DateTime.Now + " 开始编码" + pid);
                         builder日志.AppendLine("------------------------------------------");
                         if (b无缓转码) {
@@ -557,9 +558,9 @@ namespace 破片压缩器 {
                 builder日志.Append(DateTime.Now).Append(" 异常退出，代码：").Append(process.ExitCode);
                 try { File.WriteAllText($"{fi编码.DirectoryName}\\FFmpegAsync异常.{str成功文件名}@{DateTime.Now:yy-MM-dd HH.mm.ss}.errlog", builder日志.ToString( )); } catch { }
 
-                Thread.Sleep(999); 转码队列.process主动移除结束(this);//发生异常停顿一秒再继续下一个。
+                Thread.Sleep(999); 转码队列.process移除结束(this);//发生异常停顿一秒再继续下一个。
             } else {
-                转码队列.process主动移除结束(this);
+                转码队列.process移除结束(this);
                 builder日志.AppendFormat("{0:yyyy-MM-dd HH:mm:ss} 均速{1:F4}fps 耗时 {2} ({3})秒", DateTime.Now, getFPS( ), stopwatch.Elapsed, stopwatch.ElapsedMilliseconds / 1000);
                 if (File.Exists(fi编码.FullName)) {
                     if (!di编码成功.Exists) try { di编码成功.Create( ); } catch { return; }
@@ -577,7 +578,11 @@ namespace 破片压缩器 {
                             try {
                                 Directory.CreateDirectory(str已编码源);
                                 fi源.MoveTo(str已编码源 + "\\" + fi源.Name);
-                            } catch { }
+                            } catch {
+                                try {
+                                    fi源.MoveTo(str已编码源 + "\\" + fi源.Name + DateTime.Now.ToString("yyyy.MM.dd.HH.mm.ss.fff"));
+                                } catch { }
+                            }
                         }
                     }
                     string str提取时间码命令行 = string.Format("timestamps_v2 {0} 0:{1}_timestamp.txt", fi编码.Name, str成功文件名);
