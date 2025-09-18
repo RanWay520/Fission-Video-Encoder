@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using static System.Net.Mime.MediaTypeNames;
 using static 破片压缩器.VTimeBase;
 
 
@@ -284,7 +285,7 @@ namespace 破片压缩器 {
                 return true;
             else return false;
         }
-        public bool is重算时间码(string path转码完成) {
+        public bool is重算时间码(string path转码完成, string str编码摘要) {
             bool b重算成功 = false;
             string timestamp_v2 = "# timestamp format v2";
             StringBuilder @string = new StringBuilder(timestamp_v2);
@@ -313,8 +314,7 @@ namespace 破片压缩器 {
                 @string.AppendLine( ).Append(Duration * 1000);
                 timestamp_v2 = @string.ToString( );
                 DirectoryInfo di成功目录 = new DirectoryInfo(path转码完成);//合成函数会尝试合成切片目录下不同参数的文件
-                try { File.WriteAllText(di成功目录.FullName + "\\重算时间码.txt", timestamp_v2); } catch { }
-                try { File.WriteAllText(di成功目录.Parent.FullName + "\\重算时间码.txt", timestamp_v2); } catch { }
+                try { File.WriteAllText($"{di成功目录.Parent.FullName}\\重算时间码_{str编码摘要}.txt", timestamp_v2); } catch { }
                 b重算成功 = true;
             }
             return b重算成功;
@@ -552,17 +552,20 @@ namespace 破片压缩器 {
             List<float> list分段秒 = new List<float>( ) { 0 };
             float f后6组 = 0;
             do {
-                while (转码队列.b队列满 && set体积降序编码序列.Count > 0) event计算.WaitOne(666);//正在转码的情况直接等待扫描结果，减少异步计算分段异常
+                while (转码队列.b队列满 && set体积降序编码序列.Count > 0) 
+                    event计算.WaitOne(666);//正在转码的情况直接等待扫描结果，减少异步计算分段异常
 
                 f后6组 += sec_gop * 6;//每轮
                 for (float sec一打GOP = f后6组 + sec_gop * 6; !is扫描完成 && getSpan最慢 <= sec一打GOP;) event计算.WaitOne(6666);//缓冲跨步时长12组。
 
-                if (index黑场 < list黑场.Count - 1 && list黑场[index黑场] <= f后6组) {
+
+                if ((index黑场 < list黑场.Count - 1 || (index黑场 < list黑场.Count && list黑场.Last( ) < Duration)) && list黑场[index黑场] <= f后6组) {
                     for (++index黑场; index黑场 < list黑场.Count && list黑场[index黑场] <= f后6组; index黑场++) {//步时长6图组内寻找下一黑场。
                         if (list黑场[index黑场] - list分段秒.Last( ) > sec_gop * 3) {//两个黑场之间超过3个图组尝试寻找插入转场。
                             fx查找区间镜头切换(list分段秒.Last( ) + sec分割至少, list黑场[index黑场] - sec分割至少, ref index转场, ref list分段秒);
                         }
-                        list分段秒.Add(list黑场[index黑场]);
+                        //if (list黑场[index黑场] > list分段秒.Last( ))
+                            list分段秒.Add(list黑场[index黑场]);
                     }
                 }
 
@@ -573,9 +576,8 @@ namespace 破片压缩器 {
                 }
 
                 if (!is扫描完成 && DateTime.Now.Subtract(timeStart).TotalMinutes > 1) {
-                    fx匹配关键帧(ref index关键帧, ref list分段秒);
-
                     int i上次分段数 = dic_分段_偏移.Count;
+                    fx匹配关键帧(ref index关键帧, ref list分段秒);
                     if (dic_分段_偏移.Count > i上次分段数 && getSpan最慢 < Duration) {
                         fx保存有序无缓转码csv(b完成: false);
                         timeStart = DateTime.Now;

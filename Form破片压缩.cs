@@ -656,7 +656,7 @@ namespace 破片压缩器 {
             Settings.str自定义滤镜 = textBox_lavfi.Text.Trim( ).Trim(',');
 
             Settings.b根据帧率自动强化CRF = checkBox_DriftCRF.Checked;
-
+            Settings.b硬字幕=checkBox_硬字幕.Checked;
             Settings.opus = checkBoxOpus.Checked;
             Settings.b音轨同时切片转码 = checkBoxSplitAudio.Checked;
 
@@ -790,7 +790,11 @@ namespace 破片压缩器 {
         private void comboBox切片模式_SelectedIndexChanged(object sender, EventArgs e) {
             int SelectedIndex = comboBox切片模式.SelectedIndex;
             Settings.b无缓转码 = false;
+
+            checkBox_硬字幕.Checked = false;
+            checkBox_硬字幕.Visible = false;
             checkBox编码后删除切片.Visible = true;
+            
             if (SelectedIndex == 0) {
                 i切片间隔秒 = Settings.sec_gop * 6;
                 Settings.b扫描场景 = true;
@@ -798,10 +802,12 @@ namespace 破片压缩器 {
             } else if (SelectedIndex == 8) {
                 i切片间隔秒 = Settings.sec_gop * 3;
                 Settings.b无缓转码 = Settings.b扫描场景 = true;
+                checkBox_硬字幕.Visible = true;
                 checkBox编码后删除切片.Visible = false;
                 numericUpDown_分割最小秒.Visible = numericUpDown检测镜头.Visible = true;
 
             } else if (SelectedIndex == 9) {
+                checkBox_硬字幕.Visible = true;
                 checkBox编码后删除切片.Visible = numericUpDown_分割最小秒.Visible = numericUpDown检测镜头.Visible = false;
                 i切片间隔秒 = Settings.sec_gop * 6;
                 Settings.b无缓转码 = true;

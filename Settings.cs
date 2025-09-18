@@ -45,8 +45,8 @@ namespace 破片压缩器 {
             set { _i缩小到高 = value < i最小边长 ? -4 : value; }
             get { return _i缩小到高; }
         }
-      
 
+        public static bool b硬字幕;
         public static bool b转可变帧率;
 
         public static bool b磨皮降噪, b自动裁黑边;

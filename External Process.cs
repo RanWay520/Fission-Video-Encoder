@@ -580,8 +580,12 @@ namespace 破片压缩器 {
                                 fi源.MoveTo(str已编码源 + "\\" + fi源.Name);
                             } catch {
                                 try {
-                                    fi源.MoveTo(str已编码源 + "\\" + fi源.Name + DateTime.Now.ToString("yyyy.MM.dd.HH.mm.ss.fff"));
-                                } catch { }
+                                    fi源.MoveTo($"{str已编码源}\\{str成功文件名}{DateTime.Now.ToString("yyyy.MM.dd.HH.mm.ss.fff")}{fi源.Extension}");
+                                } catch {
+                                    try { fi源.MoveTo($"{fi源.DirectoryName}\\{str成功文件名}{DateTime.Now.ToString("yyyy.MM.dd.HH.mm.ss.fff")}{fi源.Extension}"); } catch {
+
+                                    }
+                                }
                             }
                         }
                     }
