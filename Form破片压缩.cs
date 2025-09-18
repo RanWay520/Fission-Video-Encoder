@@ -8,7 +8,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using static 破片压缩器.Scene;
 
 
 namespace 破片压缩器 {
@@ -732,7 +731,7 @@ namespace 破片压缩器 {
                     }
                     timer刷新编码输出.Start( );
                 } else {
-                    if (Video_Roadmap.b查找可执行文件(out string log)) {
+                    if (Video_Roadmap.b查找可执行文件(out string log,out string txt)) {
                         button刷新.Text = "刷新(&R)";
                         thread切片.Start( );
                         thread转码.Start( );
@@ -742,6 +741,7 @@ namespace 破片压缩器 {
                         timer刷新编码输出.Enabled = true;
                     } else {
                         add日志($"需要在工具同目录放入：" + log);
+                        textBox日志.Text = txt;
                     }
                     new UpdateFFmpeg( );
                 }
@@ -1136,7 +1136,7 @@ namespace 破片压缩器 {
         }
         private void Form破片压缩_Load(object sender, EventArgs e) {
             CPUNum( );
-
+            //Extract_EXE.resources_to_exe( );
             comboBox_lib.SelectedIndex = 0;
             comboBox_Crop.SelectedIndex = 0;
             //comboBox切片模式.SelectedIndex = 3;//30秒
