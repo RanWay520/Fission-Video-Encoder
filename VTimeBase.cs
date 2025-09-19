@@ -167,6 +167,7 @@ namespace 破片压缩器 {
                     }
                     var dicSort_Sec = from objDic in dic_分段_偏移 orderby objDic.Value.f持续秒 descending select objDic;
                     foreach (var item in dicSort_Sec) lock (obj读取文件号) set体积降序编码序列.Add(item.Key);//按时长排序添加
+                    b正在计算 = false;
                     return true;
                 }
             }
@@ -196,7 +197,7 @@ namespace 破片压缩器 {
                 b读取关键帧 = is成功读取(ref list关键帧, "关键帧", path视频同目录关键帧时间戳, ref span);
 
                 if (!b读取关键帧) {
-                    th扫关键帧 = new Thread(fn扫关键帧) { IsBackground = true, Name = "扫关键帧" };
+                    th扫关键帧 = new Thread(fn扫关键帧) { IsBackground = true, Name = "扫关键帧" + fi输入文件.Name };
                     th扫关键帧.Start( );
                 }
             }
@@ -206,7 +207,7 @@ namespace 破片压缩器 {
                 string path视频同目录转场时间戳 = $"{fi输入文件.DirectoryName}\\检测镜头({scene:F3}).{fi输入文件.Name}.info";
                 b读取转场 = is成功读取(ref list转场, "转场", path视频同目录转场时间戳, ref span扫转场进度);
                 if (!b读取转场) {
-                    th扫转场 = new Thread(fn扫转场) { IsBackground = true, Name = "扫转场" };
+                    th扫转场 = new Thread(fn扫转场) { IsBackground = true, Name = "扫转场" + fi输入文件.Name };
                     th扫转场.Start( );
                 }
             }
@@ -216,7 +217,7 @@ namespace 破片压缩器 {
                 string path视频同目录黑场时间戳 = $"{fi输入文件.DirectoryName}\\检测黑场({x黑度},{x像素黑阈}).{fi输入文件.Name}.info";
                 b读取黑场 = is成功读取(ref list黑场, "黑场", path视频同目录黑场时间戳, ref span扫黑场进度);
                 if (!b读取黑场) {
-                    th扫黑场 = new Thread(fn扫黑场) { IsBackground = true, Name = "扫黑场" };
+                    th扫黑场 = new Thread(fn扫黑场) { IsBackground = true, Name = "扫黑场" + fi输入文件.Name };
                     th扫黑场.Start( );
                 }
             }
@@ -226,7 +227,7 @@ namespace 破片压缩器 {
             //    string path视频同目录白场时间戳 = $"{fi输入文件.DirectoryName}\\检测白场({x白度},{x像素白阈}).{fi输入文件.Name}.info";
             //    b读取白场 = is成功读取(ref list白场, "白场", path视频同目录白场时间戳, ref span扫黑场进度);
             //    if (!b读取白场) {
-            //        th扫白场 = new Thread(fn扫白场) { IsBackground = true };
+            //        th扫白场 = new Thread(fn扫白场) { IsBackground = true ,Name = "扫白场" + fi输入文件.Name};
             //        th扫白场.Start( );
             //    }
             //}
@@ -234,7 +235,7 @@ namespace 破片压缩器 {
             if (b读取关键帧 && b读取转场 && b读取黑场 && b读取白场) {
                 fn循环计算分段点并存盘( );
             } else {
-                th循环计算 = new Thread(fn循环计算分段点并存盘) { IsBackground = true, Name = "循环计算分段点并存盘" };
+                th循环计算 = new Thread(fn循环计算分段点并存盘) { IsBackground = true, Name = "循环计算分段点并存盘" + fi输入文件.Name };
                 th循环计算.Start( );
             }
             转码队列.Add_VTimeBase(this);
@@ -256,7 +257,7 @@ namespace 破片压缩器 {
                 }
             }
 
-            th循环计算 = new Thread(fn循环计算关键帧并存盘) { IsBackground = true, Name = "循环计算关键帧并存盘" };
+            th循环计算 = new Thread(fn循环计算关键帧并存盘) { IsBackground = true, Name = "循环计算关键帧并存盘" + fi输入文件.Name };
             th循环计算.Start( );
         }
 

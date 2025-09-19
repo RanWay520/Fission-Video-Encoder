@@ -193,12 +193,12 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
         public VideoInfo info;
         public VTimeBase vTimeBase;
         bool bVFR = true;
-        bool _b有切片记录 = false, _b音轨同时切片 = false, _b_opus = false, b音轨已转码 = false, _bGOP传参, _b无缓转码 = false;
+        bool _b有切片记录 = false, _b音轨同时切片 = false, _b_opus = false, _bGOP传参, _b无缓转码 = false;
 
-        FileInfo fiMKA = null, fiOPUS = null, fi视频头信息 = null, fi拆分日志 = null, fi合并日志 = null,fi外挂字幕=null;
+        FileInfo fiMKA = null, fiOPUS = null, fi视频头信息 = null, fi拆分日志 = null, fi合并日志 = null, fi外挂字幕 = null;
 
         string path无缓转码csv = string.Empty;
-        string lib视频编码器, lib多线程视频编码器,lavfi字幕, lavfi全局值, str自定义滤镜值, str滤镜lavfi, str编码摘要, str音频命令, str音频摘要, str多线程编码指令, str编码指令;
+        string lib视频编码器, lib多线程视频编码器, lavfi字幕, lavfi全局值, str自定义滤镜值, str滤镜lavfi, str编码摘要, str音频命令, str音频摘要, str多线程编码指令, str编码指令;
         string str连接视频名, str转码后MKV名, strMKA名, str完整路径MKA, str水印字体路径, str水印字体参数;
 
         string str输出格式 = ".mkv", str最终格式;
@@ -214,7 +214,7 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
         Thread th音频转码;
 
         public FileSystemWatcher watcher编码成功文件夹 = null;
-        public static bool b查找可执行文件(out string log,out string txt) {
+        public static bool b查找可执行文件(out string log, out string txt) {
             log = string.Empty;
             txt = string.Empty;
 
@@ -353,9 +353,32 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
         }
 
         Regex regexPTS_Time = new Regex(@"pts_time:(\d+(?:\.\d+)?)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        public bool is无缓视频未完成 {
+            get {
+                if (File.Exists(path无缓转码csv)) {// && Directory.Exists(di编码成功.FullName)
+                    if (vTimeBase.is扫描完成 && vTimeBase.i剩余分段 <= 0) {
+                        FileInfo[] arrFI_MKV视频 = di编码成功.GetFiles("*.mkv");
+                        if (arrFI_MKV视频.Length >= vTimeBase.i总分段) {
+                            int count = 0;
+                            for (int i = 0; i < arrFI_MKV视频.Length; i++) {
+                                string num = arrFI_MKV视频[i].Name.Substring(0, arrFI_MKV视频[i].Name.Length - 4);
+                                if (int.TryParse(num, out _)) count++;
+                            }
+                            if (count >= vTimeBase.i总分段) return false;
+                        }
+                    }
+                }
+                return true;
+            }
+        }
+
         public bool b文件夹下还有切片 {
             get {
-                if (_b_opus && !_b音轨同时切片 && !b音轨已转码 && info.list音频轨.Count > 0) return true;
+                if (_b_opus && !_b音轨同时切片 && info.list音频轨.Count > 0) {
+                    if (fiOPUS != null && !File.Exists(fiOPUS.FullName))
+                        return true;
+                }
 
                 if (_b无缓转码) {
                     if (File.Exists(path无缓转码csv)) {// && Directory.Exists(di编码成功.FullName)
@@ -626,7 +649,7 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
             builder.AppendLine( ).AppendLine("提取MKA音轨：").Append(commamd);
             builder.AppendLine(commamd);
 
-            转码队列.process切片 = new External_Process(mkvmerge, commamd, str切片路径, fi输入视频); 
+            转码队列.process切片 = new External_Process(mkvmerge, commamd, str切片路径, fi输入视频);
             转码队列.process切片.sync_MKVmerge保存消息(str切片路径, str日志文件, out string[] logs, ref builder);
             转码队列.process切片 = null;
 
@@ -903,11 +926,10 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
                         th音频转码 = new Thread(new ParameterizedThreadStart(fn_音频转码成功信号)) { IsBackground = true };
                         th音频转码.Start(external_Process); //避免音频比视频后出结果，额外开一条等待线程，完成时触发b音轨转码成功布尔值。
                         return true;
-                    } else { 
-                        b音轨已转码 = true;//文件存在直接标记
+                    } else {
                         Form破片压缩.autoReset合并.Set( );
                     }
-                } else if ( File.Exists(fi输入视频.FullName)) {
+                } else if (File.Exists(fi输入视频.FullName)) {
                     str音频摘要 = ".opus";
                     StringBuilder builder = new StringBuilder(EXE.ffmpeg单线程);
 
@@ -941,7 +963,6 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
                         th音频转码.Start(external_Process); //避免音频比视频后出结果，额外开一条等待线程，完成时触发b音轨转码成功布尔值。
                         return true;
                     } else {
-                        b音轨已转码 = true;//文件存在直接标记
                         Form破片压缩.autoReset合并.Set( );
                     }
                 }
@@ -949,13 +970,15 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
             return false;
         }
         public bool b更新OPUS音轨( ) {//在合并环节启动，视频没完成之前，音频码率可以热修改。
+
+            if (th音频转码 != null && th音频转码.IsAlive) return false;
+
             if (fiMKA == null || !File.Exists(fiMKA.FullName)) {//任务穿插进视频转码全过程，可能出现音轨被删除、视频被删除的情况。
                 if (File.Exists(fi输入视频.FullName))
                     fiMKA = fi输入视频;
                 else {
                     info.list音频轨.Clear( );
                     str音频摘要 = ".noAu";
-                    b音轨已转码 = true;
                     return false;
                 }
             }
@@ -991,11 +1014,8 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
                 fiOPUS = fi成功音轨;
                 str最终格式 = info.OUT.str视流格式 == "av1" ? ".webm" : ".mkv";
                 return File.Exists(fiOPUS.FullName);
-            }else
-                
-
-            b音轨已转码 = true;//尝试转码过也标记为真，不论成功失败。
-            return false;
+            } else
+                return false;
         }
 
         public bool b转码后混流( ) {//混流线程中有加入是否还有剩余切片判断。
@@ -1105,7 +1125,6 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
             } else
                 转码队列.process音轨 = null;
 
-            b音轨已转码 = true;//转码过后不论成功失败标记为已转码。
             if (!b文件夹下还有切片) Form破片压缩.autoReset合并.Set( );//有时音频转码速度比视频转码慢。
         }
 
@@ -1347,7 +1366,7 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
                 else list_SerialName.Sort( );
 
                 if (!_b音轨同时切片) {
-                    if (_b无缓转码) vTimeBase.is重算时间码(path转码完成,str编码摘要);
+                    if (_b无缓转码) vTimeBase.is重算时间码(path转码完成, str编码摘要);
                     else b重算时间码(path转码完成, list_SerialName);
                 }
                 StringBuilder builder = new StringBuilder( );
@@ -1527,7 +1546,7 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
             StringBuilder builder = new StringBuilder( );
             builder.AppendFormat("--output \"{0}.mkv\" --no-track-tags --no-global-tags --track-name 0:{1}", str转码后MKV名, str编码摘要);//视轨有文件移动操作，使用相对路径
 
-            FileInfo fi时间码 = new FileInfo( $"{str切片路径}\\重算时间码_{str编码摘要}.txt");
+            FileInfo fi时间码 = new FileInfo($"{str切片路径}\\重算时间码_{str编码摘要}.txt");
             if (fi时间码.Exists) {
                 builder.Append(" --timestamps 0:").Append(fi时间码.Name);
             }
@@ -1545,7 +1564,6 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
                 builder.AppendFormat(" \"{0}\"", fi外挂字幕.FullName);
             }
 
-
             FileInfo fi切片日志 = null;
             if (fi拆分日志 != null && File.Exists(fi拆分日志.FullName)) {
                 fi切片日志 = fi拆分日志;
@@ -1558,9 +1576,10 @@ Chooses between cfr and vfr depending on muxer capabilities. This is the default
                     fi切片日志 = new FileInfo(copyPath);
                 }
             }
-            if (fi切片日志 != null) {
+            if (!_b无缓转码 && fi切片日志 != null) {//无缓转码没有切片数据。
                 builder.AppendFormat(" --attachment-name \"切片日志.txt\" --attachment-mime-type text/plain --attach-file \"{0}\"", fi切片日志.Name);
             }
+
             if (fi合并日志 != null) {
                 string copy = $"{fi连接后视频.DirectoryName}\\{fi合并日志.Name}";
                 if (File.Exists(copy)) {
