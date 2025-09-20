@@ -17,8 +17,8 @@ namespace 破片压缩器 {
             , str滤镜lavfi = string.Empty
             , str视频名无后缀 = string.Empty
             , str水印字体参数 = string.Empty
-            , str编码指令 = string.Empty, str多线程编码指令 = string.Empty, ffmpeg单线程解码=string.Empty;
-            
+            , str编码指令 = string.Empty, str多线程编码指令 = string.Empty, ffmpeg单线程解码 = string.Empty;
+
 
         bool b切片序号水印 = false;
         public DirectoryInfo di切片文件夹;
@@ -178,7 +178,7 @@ namespace 破片压缩器 {
                     str命令行 = $"{ffmpeg单线程解码} -i {fi切片.Name} {str滤镜} {str多线程编码指令} \"{str编码后切片}\" {EXE.ffmpeg不显库}";
                 else {
                     str命令行 = $"{EXE.ffmpeg单线程} -i {fi切片.Name} {str滤镜} {str编码指令} \"{str编码后切片}\" {EXE.ffmpeg不显库}";
-                } 
+                }
                 external_Process = new External_Process(ffmpeg, str命令行, !Settings.b多线程, name, fi切片, di编码成功);
                 external_Process.fi编码 = new FileInfo($"{fi切片.DirectoryName}\\{str编码后切片}");//fi切片设计为局域网编码时移动到另外文件夹，防止多机处理相同切片
                 return true;

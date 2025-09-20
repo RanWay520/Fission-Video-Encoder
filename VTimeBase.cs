@@ -4,14 +4,10 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.ServiceModel.Syndication;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Forms;
-using static System.Net.Mime.MediaTypeNames;
-using static 破片压缩器.VTimeBase;
 
 
 namespace 破片压缩器 {
@@ -44,7 +40,7 @@ namespace 破片压缩器 {
             , dic白场 = new ConcurrentDictionary<float, string>( )
             ;
 
-        string str单线程;
+        string str单线程 = string.Empty;
         float scene = 0.11f, sec分割至少 = 2, sec_gop, Duration = 0, Duration加一帧, f连续黑场最小秒 = 0.5f;
 
         public AutoResetEvent event计算 = new AutoResetEvent(false);
@@ -130,6 +126,7 @@ namespace 破片压缩器 {
             if (vinfo.time视频时长 > TimeSpan.Zero)
                 Duration = (float)vinfo.time视频时长.TotalSeconds;
 
+            path输出目录关键帧时间戳 = di输出目录.FullName + "\\关键帧时间戳.info";
 
         }
 
@@ -181,14 +178,14 @@ namespace 破片压缩器 {
             this.sec分割至少 = sec分割至少;
             this.f连续黑场最小秒 = f连续黑场最小秒;
 
-            str单线程 = b单线程 ? EXE.ffmpeg单线程 : string.Empty;
+            //str单线程 = b单线程 ? EXE.ffmpeg单线程 : string.Empty;
 
             int x黑度 = 98, x像素黑阈 = 32, x白度 = 98, x像素白阈 = 250;
 
-            path输出目录关键帧时间戳 = di输出目录.FullName + "\\关键帧时间戳.info";
             path输出目录转场时间戳 = di输出目录.FullName + $"\\检测镜头({scene:F3}).info";
             path输出目录黑场时间戳 = di输出目录.FullName + $"\\检测黑场({x黑度},{x像素黑阈}).info";
             path输出目录白场时间戳 = di输出目录.FullName + $"\\检测白场({x白度},{x像素白阈}).info";
+
 
             TimeSpan span = TimeSpan.Zero;
             b读取关键帧 = is成功读取(ref list关键帧, "关键帧", path输出目录关键帧时间戳, ref span);
@@ -232,11 +229,11 @@ namespace 破片压缩器 {
             //    }
             //}
 
-            if (b读取关键帧 && b读取转场 && b读取黑场 && b读取白场) {
-                fn循环计算分段点并存盘( );
+            if (b读取关键帧 && b读取转场 && b读取黑场) {
+                fx同步计算分段点并存盘( );
             } else {
-                th循环计算 = new Thread(fn循环计算分段点并存盘) { IsBackground = true, Name = "循环计算分段点并存盘" + fi输入文件.Name };
-                th循环计算.Start( );
+                //th循环计算 = new Thread(fn循环计算分段点并存盘) { IsBackground = true, Name = "循环计算分段点并存盘" + fi输入文件.Name };
+                //th循环计算.Start( );//异步计算算法有BUG，改用同步计算。
             }
             转码队列.Add_VTimeBase(this);
         }
@@ -247,7 +244,7 @@ namespace 破片压缩器 {
             TimeSpan span = TimeSpan.Zero;
             b读取关键帧 = is成功读取(ref list关键帧, "关键帧", path输出目录关键帧时间戳, ref span);
             if (!b读取关键帧) {
-                string path视频同目录关键帧时间戳 = fi输入文件.FullName + "_关键帧时间戳.info";
+                string path视频同目录关键帧时间戳 = $"{fi输入文件.DirectoryName}\\关键帧时间戳_{fi输入文件.Name}.info";
                 b读取关键帧 = is成功读取(ref list关键帧, "关键帧", path视频同目录关键帧时间戳, ref span);
                 if (!b读取关键帧) {
                     th扫关键帧 = new Thread(fn扫关键帧) { IsBackground = true, Name = "扫关键帧" };
@@ -262,22 +259,16 @@ namespace 破片压缩器 {
         }
 
         public bool GetTxt(out string txt) {
-            txt = fi输入文件.FullName + "\r\n";
-
-            if (!string.IsNullOrEmpty(str扫转场)) txt = "正在扫描转场时刻：" + str扫转场 + "\r\n";
+            txt = "\r\n" + fi输入文件.FullName + "\r\n";
+            if (!string.IsNullOrEmpty(str扫转场)) txt += "正在扫描转场时刻：" + str扫转场 + "\r\n";
             if (!string.IsNullOrEmpty(str扫黑场)) txt += "正在扫描黑场时刻：" + str扫黑场 + "\r\n";
             if (!string.IsNullOrEmpty(str扫白场)) txt += "正在扫描白场时刻：" + str扫白场 + "\r\n";
             if (!string.IsNullOrEmpty(str扫关键帧)) txt += "正在扫描关键帧：" + str扫关键帧 + "\r\n";
-
             if (list关键帧.Count > 0) txt += "关键帧：" + list关键帧.Last( ) + "秒 （" + list关键帧.Count + " 组）\r\n";
-
-            txt += "切割场次：" + dic_分段_偏移.Count + "\r\n";
-
             if (is扫描完成) {
                 txt += "扫描完成！\r\n";
                 转码队列.Remove_VTimeBase(this);
             }
-
             return true;
         }
 
@@ -464,18 +455,21 @@ namespace 破片压缩器 {
                 int start = index转场;
                 for (; start < list转场.Count; start++) {
                     if (list转场[start] >= secMin) {
-                        index转场 = start + 1;
                         if (list转场[start] > secMax) {
                             return;
                         } else if (list转场[start] > list分段秒.Last( ) + sec_gop * 6) {
                             list分段秒.Add(list转场[start]);
                             secMin = list转场[start] + sec分割至少;
+                            index转场 = start + 1;
                         } else
                             break;
                     }
                 }
-
-                if (start > 0 && start < list转场.Count && list转场[start] - list分段秒.Last( ) >= sec分割至少 && list转场[start] <= secMax) {
+                if (start >= list转场.Count) {
+                    index转场 = start + 1;
+                    return;
+                }
+                if (list转场[start] - list分段秒.Last( ) >= sec分割至少 && list转场[start] <= secMax) {
                     int end = start + 1;
                     float sec_gop_end = list转场[start] + sec_gop * 6;
                     float sec止步 = sec_gop_end < secMax ? sec_gop_end : secMax;
@@ -518,9 +512,9 @@ namespace 破片压缩器 {
                         index转场 = start + 1;
                         return;
                     }
-                } else
+                } else {
                     return;
-
+                }
             } while (index转场 < list转场.Count && list转场[index转场] < secMax);
         }
 
@@ -549,34 +543,37 @@ namespace 破片压缩器 {
         void fn循环计算分段点并存盘( ) {
             DateTime timeStart = DateTime.Now.AddMinutes(-1);
             if (!is扫描完成) Thread.Sleep(6666);
-            int index黑场 = 0, index转场 = 0, index关键帧 = 0;
+            int index黑场 = 1, index转场 = 1, index关键帧 = 0;
             List<float> list分段秒 = new List<float>( ) { 0 };
             float f后6组 = 0;
+
             do {
-                while (转码队列.b队列满 && set体积降序编码序列.Count > 0) 
-                    event计算.WaitOne(666);//正在转码的情况直接等待扫描结果，减少异步计算分段异常
+                while (转码队列.b队列满 && set体积降序编码序列.Count > 0 && !is扫描完成)
+                    event计算.WaitOne(666);
 
                 f后6组 += sec_gop * 6;//每轮
-                for (float sec一打GOP = f后6组 + sec_gop * 6; !is扫描完成 && getSpan最慢 <= sec一打GOP;) event计算.WaitOne(6666);//缓冲跨步时长12组。
+                float sec一打GOP = f后6组 + sec_gop * 6;
+                if (f后6组 > Duration) {
+                    sec一打GOP = f后6组 = Duration;
+                }
+                for (; getSpan最慢 <= sec一打GOP;) event计算.WaitOne(6666);//缓冲跨步时长12组。
 
-
-                if ((index黑场 < list黑场.Count - 1 || (index黑场 < list黑场.Count && list黑场.Last( ) < Duration)) && list黑场[index黑场] <= f后6组) {
-                    for (++index黑场; index黑场 < list黑场.Count && list黑场[index黑场] <= f后6组; index黑场++) {//步时长6图组内寻找下一黑场。
+                //if ((index黑场 < list黑场.Count - 1 || (index黑场 < list黑场.Count && list黑场.Last( ) < Duration)) && list黑场[index黑场] <= f后6组) {
+                if (index黑场 < list黑场.Count && list黑场[index黑场] <= f后6组) {
+                    for (++index黑场; index黑场 < list黑场.Count && list黑场[index黑场] < f后6组; index黑场++) {//步时长6图组内寻找下一黑场。
                         if (list黑场[index黑场] - list分段秒.Last( ) > sec_gop * 3) {//两个黑场之间超过3个图组尝试寻找插入转场。
                             fx查找区间镜头切换(list分段秒.Last( ) + sec分割至少, list黑场[index黑场] - sec分割至少, ref index转场, ref list分段秒);
                         }
-                        //if (list黑场[index黑场] > list分段秒.Last( ))
-                            list分段秒.Add(list黑场[index黑场]);
+                        list分段秒.Add(list黑场[index黑场]);
                     }
-                }
-
-                if (index转场 < list转场.Count - 2 && list转场[index转场] < f后6组) { //时段内无黑场，可能有转场
+                } else if (index转场 < list转场.Count && list转场[index转场] <= f后6组) { //时段内无黑场，可能有转场
                     fx查找区间镜头切换(list分段秒.Last( ) + sec分割至少, f后6组, ref index转场, ref list分段秒);//每次后移6组
                 } else if (is扫描完成 && index黑场 >= list黑场.Count - 1 && list黑场.Last( ) == Duration加一帧 && list转场.Last( ) == Duration加一帧) {
                     fx添加结尾(list分段秒.Last( ) + sec分割至少, ref index转场, ref list分段秒);
+                    break;
                 }
 
-                if (!is扫描完成 && DateTime.Now.Subtract(timeStart).TotalMinutes > 1) {
+                if (!is扫描完成 && DateTime.Now.Subtract(timeStart).TotalSeconds > 10) {
                     int i上次分段数 = dic_分段_偏移.Count;
                     fx匹配关键帧(ref index关键帧, ref list分段秒);
                     if (dic_分段_偏移.Count > i上次分段数 && getSpan最慢 < Duration) {
@@ -590,7 +587,34 @@ namespace 破片压缩器 {
             fx匹配关键帧(ref index关键帧, ref list分段秒);
             fx保存有序无缓转码csv(b完成: true);
         }
+        void fx同步计算分段点并存盘( ) {
+            int index黑场 = 1, index转场 = 1, index关键帧 = 0;
+            List<float> list分段秒 = new List<float>( ) { 0 };
+            float f后6组 = 0;
+            do {
+                f后6组 += sec_gop * 6;//每轮
 
+                if (f后6组 > Duration) f后6组 = Duration;
+
+                if (index黑场 < list黑场.Count && list黑场[index黑场] <= f后6组) {
+                    for (++index黑场; index黑场 < list黑场.Count && list黑场[index黑场] < f后6组; index黑场++) {//步时长6图组内寻找下一黑场。
+                        if (list黑场[index黑场] - list分段秒.Last( ) > sec_gop * 3) {//两个黑场之间超过3个图组尝试寻找插入转场。
+                            fx查找区间镜头切换(list分段秒.Last( ) + sec分割至少, list黑场[index黑场] - sec分割至少, ref index转场, ref list分段秒);
+                        }
+                        list分段秒.Add(list黑场[index黑场]);
+                    }
+                } else if (index转场 < list转场.Count && list转场[index转场] <= f后6组) { //时段内无黑场，可能有转场
+                    fx查找区间镜头切换(list分段秒.Last( ) + sec分割至少, f后6组, ref index转场, ref list分段秒);//每次后移6组
+                } else if (is扫描完成 && index黑场 >= list黑场.Count - 1 && list黑场.Last( ) == Duration加一帧 && list转场.Last( ) == Duration加一帧) {
+                    fx添加结尾(list分段秒.Last( ) + sec分割至少, ref index转场, ref list分段秒);
+                    break;
+                }
+            } while (f后6组 < Duration);//分段结束
+            list分段秒.Distinct( );
+            list分段秒.Sort( );
+            fx匹配关键帧(ref index关键帧, ref list分段秒);
+            fx保存有序无缓转码csv(b完成: true);
+        }
         void fx获取时长( ) {
             using (Process p = new Process( )) {
                 string cmd = "-v error -show_entries format=duration \"" + fi输入文件.FullName + '"';
@@ -637,6 +661,7 @@ namespace 破片压缩器 {
                     try { File.WriteAllText(path输出目录关键帧时间戳, txt); } catch { }
                 }
                 list关键帧.Add(Duration加一帧);//队列末用于计算完成时刻，同时判断扫描线程结束。
+                if (is扫描完成) fx同步计算分段点并存盘( );//所有扫描线程完毕后，触发同步计算
             }
         }
         void fn扫转场( ) {
@@ -686,6 +711,7 @@ namespace 破片压缩器 {
 
                 span扫转场进度 = TimeSpan.FromSeconds(Duration加一帧);
                 list转场.Add(Duration加一帧);//队列末尾也用于判断进程结束
+                if (is扫描完成) fx同步计算分段点并存盘( );//所有扫描线程完毕后，触发同步计算
             }
         }
         void fn扫黑场( ) {
@@ -733,6 +759,7 @@ namespace 破片压缩器 {
 
                 span扫黑场进度 = TimeSpan.FromSeconds(Duration加一帧);
                 list黑场.Add(Duration加一帧);//队列末尾也用于判断进程结束
+                if (is扫描完成) fx同步计算分段点并存盘( );//所有扫描线程完毕后，触发同步计算
             }
         }
         void fn扫白场( ) {
@@ -778,6 +805,7 @@ namespace 破片压缩器 {
 
                 span扫白场进度 = TimeSpan.FromSeconds(Duration加一帧);
                 list白场.Add(Duration加一帧);//队列末尾也用于判断进程结束
+                if (is扫描完成) fx同步计算分段点并存盘( );//所有扫描线程完毕后，触发同步计算
             }
         }
         ProcessStartInfo get_StartInfo(string exe, string cmd) {
@@ -985,6 +1013,8 @@ namespace 破片压缩器 {
                 dic白场.Clear( );
                 dic转场帧.Clear( );
                 b正在计算 = false;
+                转码队列.Remove_VTimeBase(this);
+                Form破片压缩.autoReset转码.Set( );
             }
             try { File.WriteAllText(di输出目录.FullName + "\\无缓转码.csv", @string.ToString( )); } catch (Exception err) {
                 @string.AppendLine( ).Append(err.Message);

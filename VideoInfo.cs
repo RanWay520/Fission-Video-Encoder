@@ -172,7 +172,7 @@ namespace 破片压缩器 {
 
         public class 输出 {
             public float adjust_crf = 0;
-            public string  enc=string.Empty, str量化名="crf", preset = string.Empty, str视流格式 = string.Empty, denoise = string.Empty;
+            public string enc = string.Empty, str量化名 = "crf", preset = string.Empty, str视流格式 = string.Empty, denoise = string.Empty;
         }
         public class 输入 {
             public string ffmpeg单线程解码 = EXE.ffmpeg单线程解码;
@@ -265,7 +265,7 @@ namespace 破片压缩器 {
             }
 
             f输出帧率 = b隔行扫描 ? f输入帧率 * 2 : f输入帧率;
-            f输入每帧秒 = 1/f输入帧率;
+            f输入每帧秒 = 1 / f输入帧率;
             inSumFrame = (int)(f输入帧率 * time视频时长.TotalSeconds);
             outSumFrames = (int)(f输出帧率 * time视频时长.TotalSeconds);
         }

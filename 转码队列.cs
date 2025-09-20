@@ -40,7 +40,7 @@ namespace 破片压缩器 {
         public static SynchronizedCollection<VTimeBase> list扫分段 = new SynchronizedCollection<VTimeBase>( );
 
         public static bool b允许入队 => list.Count < i多进程数量;
-        public static bool b队列满 => i多进程数量>0 && list.Count >= i多进程数量;
+        public static bool b队列满 => i多进程数量 > 0 && list.Count >= i多进程数量;
 
         public static bool b缓存余量充足 {
             get {
@@ -212,11 +212,12 @@ namespace 破片压缩器 {
             return false;
         }
 
+        static readonly object obj扫描队列 = new object( );
         public static void Add_VTimeBase(VTimeBase vTime) {
-            list扫分段.Add(vTime);
+            lock (obj扫描队列) list扫分段.Add(vTime);
         }
         public static void Remove_VTimeBase(VTimeBase vTime) {
-            list扫分段.Remove(vTime);
+            lock (obj扫描队列) list扫分段.Remove(vTime);
         }
 
         public static bool Get独立进程输出(out string info) {

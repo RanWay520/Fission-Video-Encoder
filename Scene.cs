@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using static 破片压缩器.Scene;
 
 namespace 破片压缩器 {
     public class Scene {

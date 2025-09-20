@@ -1,7 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Diagnostics.Eventing.Reader;
-using System.Runtime.InteropServices;
-using System.Text;
 
 namespace 破片压缩器 {
     public static class Settings {
@@ -71,7 +68,7 @@ namespace 破片压缩器 {
         public static bool b宽度缩小 => _i缩小到宽 > i最小边长;
         public static bool b高度缩小 => _i缩小到高 > i最小边长;
 
-        public static string  str音频编码格式;
+        public static string str音频编码格式;
 
         public static bool b以DAR比例修正 = true;
 
