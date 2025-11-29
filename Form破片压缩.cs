@@ -4,7 +4,6 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Management;
-using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,7 +17,7 @@ namespace 破片压缩器 {
 
         public static bool b保存异常日志 = true;
 
-        int i切片间隔秒 = 60;
+        int i切分间隔秒 = 60;
         decimal d检测镜头精度 = new decimal(0.1);
 
         bool b更改过输入路径 = true, b更改过缓存路径 = true, b需要重扫输入 = false, b需要重扫缓存 = false, b最小化 = false;
@@ -133,14 +132,13 @@ namespace 破片压缩器 {
         }
 
         void fn后台切片( ) {
-
             while (true) {
                 更改过文件夹: b更改过输入路径 = b需要重扫输入 = false;
                 lock (obj转码队列) { list_等待转码队列.Clear( ); }
                 DirectoryInfo[] arrDir = list输入路径.ToArray( );
-                foreach (DirectoryInfo dir in arrDir) {              
+                foreach (DirectoryInfo dir in arrDir) {
                     FileInfo[] arrFileInfo;
-                    if (File.Exists(dir.FullName)) {                        
+                    if (File.Exists(dir.FullName)) {
                         arrFileInfo = new FileInfo[] { new FileInfo(dir.FullName) };//如果是文件，直接处理。
                     } else if (!Directory.Exists(dir.FullName))
                         continue;//此处循环存在等待时长，文件夹有被移动风险。判断一次文件夹存在情况。
@@ -152,49 +150,55 @@ namespace 破片压缩器 {
                         if (is有效视频(file)) {
                             txt日志($"正在读取{file.FullName}视频信息……");
                             str正在转码文件夹 = $"{str切片根目录}\\{file.DirectoryName.Replace(file.Directory.Root.FullName, "").Trim('\\')}";
-                            Video_Roadmap video = new Video_Roadmap(file, str正在转码文件夹, Settings.b无缓转码);
-                            if (!video.b解码60帧判断交错(out StringBuilder builder)) //扫描60帧，出结果较快。
-                                video.b读取视频头(out builder);
+                            Video_Roadmap roadmap = new Video_Roadmap(file, str正在转码文件夹, Settings.b无缓转码);
+                            if (!roadmap.b解码60帧判断交错(out StringBuilder builder)) //扫描60帧，出结果较快。
+                                roadmap.b读取视频头(out builder);
 
-                            if (video.b无缓转码) {//有无缓转码.info文件时，代表未完成任务为无缓模式
-                                video.b查找MKA音轨( );
-                                Task.Run(( ) => fn无缓参数(video));
+                            if (Settings.b自动裁黑边) {
+                                add日志($"扫描黑边：{roadmap.fi输入视频.Name}");
+                                roadmap.b扫描视频黑边生成剪裁参数( );
+                                autoReset初始信息.Set( );
+                            }//自动识别黑边任务还可以优化为任务并发。顺序任务逻辑较为简单，后续读取信息任务无需等待。读取信息时会查找已成功的文件夹，此文件夹包含剪裁信息。
+
+                            if (roadmap.b无缓转码) {//有无缓转码.info文件时，代表未完成任务为无缓模式
+                                roadmap.b查找MKA音轨( );
+                                Task.Run(( ) => fn无缓参数(roadmap));
                                 try { Thread.Sleep(999); } catch { } //最快每秒开启一次扫描任务。
-                                while (list_等待转码队列.Count > 0 || 转码队列.list扫分段.Count > 0) try { autoReset切片.WaitOne( ); } catch { }//只开一个扫描任务，参数调整生效更及时
+                                while (list_等待转码队列.Count > 0 || 转码队列.list扫分段.Count > 0) try { autoReset切片.WaitOne( ); } catch { }//只开一个扫描任务，参数调整生效更及时。核心较多时，单扫描任务无法使用全部核心性能，按需可多扫描任务。
                             } else {
-                                if (!video.b查找MKA音轨( )) {
-                                    add日志($"提取音轨：{video.strMKA文件名}");
-                                    Task.Run(( ) => { video.b提取MKA音轨(ref builder); });//体积大的视频会等好几分钟
-                                    if (!转码队列.b有任务) autoReset初始信息.Set( );
+                                if (!roadmap.b查找MKA音轨( )) {
+                                    add日志($"提取音轨：{roadmap.strMKA文件名}");
+                                    Task.Run(( ) => { roadmap.b提取MKA音轨(ref builder); });//体积大的视频会等好几分钟，改为后台运行
+                                    autoReset初始信息.Set( );
                                 }//mkvmerge小概率返回结果后，内存中的数据未完全写入磁盘。已增加命令行 --flush-on-close 完整写入磁盘退出
 
-                                if (!video.b有切片记录) {//如果找不到现有切片，先进行切片。
+                                if (!roadmap.b有切片记录) {//如果找不到现有切片，先进行切片。
                                     if (Settings.b扫描场景) {
                                         string log = "扫描关键帧差异，决定切片场景：" + file.Name;
                                         add日志(log);
-                                        if (!转码队列.b有任务) autoReset初始信息.Set( );//扫描场景有点费时间，增加进度输出。
-                                        if (video.b检测场景切换(d检测镜头精度, ref builder)) {//扫描关键帧需要占用大量CPU时间，任务时间片和转码可以复用。转码中可以再开一条线程，ffmpeg单线程扫描视频，提高CPU利用率和现实时间复用率。
+                                        autoReset初始信息.Set( );//扫描场景有点费时间，增加进度输出。
+                                        if (roadmap.b检测场景切换(d检测镜头精度, ref builder)) {//扫描关键帧需要占用大量CPU时间，任务时间片和转码可以复用。转码中可以再开一条线程，ffmpeg单线程扫描视频，提高CPU利用率和现实时间复用率。
                                             log = $"以关键帧差异切片：{file.Name}";
                                             add日志(log);
-                                            video.Fx按场景切片并获取列表(ref builder);
+                                            roadmap.Fx按场景切片并获取列表(ref builder);
                                         }
                                     }
-                                    if (!video.b有切片记录) {//按转场切片有失败的可能性，重新切一次。
-                                        string log = $"按{i切片间隔秒}秒切片：{file.Name}";
+                                    if (!roadmap.b有切片记录) {//按转场切片有失败的可能性，重新切一次。
+                                        string log = $"按{i切分间隔秒}秒切片：{file.Name}";
                                         add日志(log);
                                         //当前的工作流程设计是等到切片成功才开始转码。第一个视频初始化尚有优化空间。
                                         //如处理单个视频体积高达1TB，在8盘RAID0读写平均500MB/s 也需要1024*1024/512/60=34.133333分钟后才开始转码。
                                         //第一个开始切片的视频提高初始化效率的逻辑：每切出一块，开始转码一块。第二个视频则不需要。
-                                        if (!转码队列.b有任务) autoReset初始信息.Set( );//切片大文件有点费时间，增加进度输出。
-                                        video.Fx按时间切片并获取列表(i切片间隔秒, ref builder);//当视频体积非常大时，切片耗时较长，软件完全看不出进度
+                                        autoReset初始信息.Set( );//切片大文件有点费时间，增加进度输出。
+                                        roadmap.Fx按时间切片并获取列表(i切分间隔秒, ref builder);//当视频体积非常大时，切片耗时较长
                                     }
                                 }
 
-                                if (video.b有切片记录) {
-                                    video热乎的切片 = video;
-                                    int i剩余切片数量 = video.i剩余切片数量;
+                                if (roadmap.b有切片记录) {
+                                    video热乎的切片 = roadmap;
+                                    int i剩余切片数量 = roadmap.i剩余切片数量;
                                     if (i剩余切片数量 > 0) add日志($"恭喜！获得视频碎片{i剩余切片数量}片 @ {file.FullName}");
-                                    Task.Run(( ) => { fn协编参数(video); });//生成节点参数。
+                                    Task.Run(( ) => { fn协编参数(roadmap); });//生成节点参数。
                                     txt日志(builder.ToString( ));
                                     fx定时刷新切片数量(10);//协同转码会取走缓存，每10分钟刷新一次
                                 } else {
@@ -215,47 +219,46 @@ namespace 破片压缩器 {
         }//1号线程，准备好了切片，后续线程才能顺序调度。
 
         void fn协编参数(Video_Roadmap roadmap) {
-            if (Settings.b自动裁黑边) {
-                add日志($"扫描黑边：{roadmap.fi输入视频.Name}");
-                roadmap.b扫描视频黑边生成剪裁参数( );
-                if (!转码队列.b有任务) autoReset初始信息.Set( );
-            }
             if (roadmap.b拼接转码摘要( ))//多文件时，外部节点依赖存储机生成任务配置.ini
                 roadmap.fx保存任务配置( );
 
             roadmap.fx清理存编终止切片( );
 
-            lock (obj转码队列) { list_等待转码队列.Add(roadmap); }
+            if (roadmap.b文件夹下还有切片) {
+                lock (obj转码队列) { list_等待转码队列.Add(roadmap); }
+
+                lock (obj合并队列) {
+                    if (!dic_完成路径_等待合并.ContainsKey(roadmap.lower完整路径_输入视频)) {
+                        if (roadmap.watcher编码成功文件夹 != null)//协编任务采用成功文件夹监控方式
+                            roadmap.watcher编码成功文件夹.Created += 新增成功视频检查合并;
+
+                        dic_完成路径_等待合并.Add(roadmap.lower完整路径_输入视频, roadmap);
+                    }
+                }
+            } else {
+                lock (obj合并队列) {
+                    if (!dic_完成路径_等待合并.ContainsKey(roadmap.lower完整路径_输入视频)) {
+                        dic_完成路径_等待合并.Add(roadmap.lower完整路径_输入视频, roadmap);
+                    }
+                    autoReset合并.Set( );
+                }
+            }
+
             video热乎的切片 = null;
             autoReset转码.Set( );
-
-            string lowPath = roadmap.di编码成功.FullName.ToLower( );
-            if (!dic_完成路径_等待合并.ContainsKey(lowPath)) {
-                lock (obj合并队列) {
-                    dic_完成路径_等待合并.Add(lowPath, roadmap);
-                }
-                if (roadmap.watcher编码成功文件夹 != null)//协编任务采用成功文件夹监控方式
-                    roadmap.watcher编码成功文件夹.Created += 新增成功视频检查合并;
-            }
         }
         void fn无缓参数(Video_Roadmap roadmap) {
-            if (Settings.b自动裁黑边) {
-                add日志($"扫描黑边：{roadmap.fi输入视频.Name}");
-                roadmap.b扫描视频黑边生成剪裁参数( );
-                if (!转码队列.b有任务) autoReset初始信息.Set( );
-            }
             if (roadmap.b拼接转码摘要( ))
                 roadmap.fx清理存编终止切片( );//多文件时，外部节点依赖存储机生成任务配置.ini
 
             roadmap.vTimeBase.b读取无缓转码csv(roadmap.di编码成功, roadmap.info.time视频时长);
 
-
             if (roadmap.vTimeBase.i总分段 < 1) {
                 while (转码队列.list扫分段.Count > 0) try { Thread.Sleep(999); } catch { }//避免同时启动
                 add日志($"开始扫描视频帧数据：{roadmap.fi输入视频.Name}");
-                if (!Settings.b扫描场景) roadmap.vTimeBase.Start按关键帧(Settings.sec_gop);
-                else roadmap.vTimeBase.Start按转场(转码队列.b缓存余量充足, (float)d检测镜头精度, Settings.sec_gop, Settings.i分割GOP, 0.25f);
-                if (!转码队列.b有任务) autoReset初始信息.Set( );
+                if (!Settings.b扫描场景) roadmap.vTimeBase.Start按关键帧(i切分间隔秒, Scene.i分割最少秒);
+                else roadmap.vTimeBase.Start按转场(转码队列.b缓存余量充足, (float)d检测镜头精度, Settings.sec_gop, Scene.i分割最少秒, 0.25f);
+                autoReset初始信息.Set( );
             } else {
                 add日志($"已读取无缓转码.csv {roadmap.vTimeBase.i总分段} 段：{roadmap.fi输入视频.Name}");
             }
@@ -266,10 +269,10 @@ namespace 破片压缩器 {
                 }//由转码线程结束后加入合并队列
                 autoReset转码.Set( );
             } else {//未完成的暂不加入合并队列，减少合并线程重复判断
-                string lowPath = roadmap.di编码成功.FullName.ToLower( );
-                if (!dic_完成路径_等待合并.ContainsKey(lowPath)) {
+
+                if (!dic_完成路径_等待合并.ContainsKey(roadmap.lower完整路径_输入视频)) {
                     lock (obj合并队列) {
-                        dic_完成路径_等待合并.Add(lowPath, roadmap);
+                        dic_完成路径_等待合并.Add(roadmap.lower完整路径_输入视频, roadmap);
                     }
                     autoReset合并.Set( );
                 }
@@ -287,14 +290,14 @@ namespace 破片压缩器 {
                 }
                 while (list_等待转码队列.Count > 0) {
                     fx设置输出目录为当前时间( );
-                    Video_Roadmap videoTemp;
+                    Video_Roadmap roadmap;
                     lock (obj转码队列) {
                         if (list_等待转码队列.Count > 0) {
-                            videoTemp = list_等待转码队列[0];
+                            roadmap = list_等待转码队列[0];
                             list_等待转码队列.RemoveAt(0);
                         } else break;
                     }
-                    video正在转码文件 = videoTemp;
+                    video正在转码文件 = roadmap;
                     str正在源文件夹 = video正在转码文件.str输入路径;
 
                     if (video正在转码文件.b后台转码MKA音轨( )) {//单独转码OPUS音轨，CPU资源占用少，放在视频队列之前。
@@ -303,21 +306,19 @@ namespace 破片压缩器 {
 
                     while (转码队列.i多进程数量 == 0) {
                         try { autoReset转码.WaitOne( ); } catch { }
+                        if (is缓存低) autoReset切片.Set( );
                     }//存储机设置为0任务时，无限等待，编码交给外部算力节点。
 
                     this.Invoke(new Action(( ) => timer刷新编码输出.Start( )));//要委托UI线程启动计时器才能正确启动。
 
-                    if (videoTemp.b无缓转码) {
-                        if (File.Exists(videoTemp.fi输入视频.FullName)) {//任务有足够时间间隔，检测一次源文件存在情况，当手动删除源文件时跳过任务。
+                    if (roadmap.b无缓转码) {
+                        if (File.Exists(roadmap.fi输入视频.FullName)) {//任务有足够时间间隔，检测一次源文件存在情况，当手动删除源文件时跳过任务。
                             while (video正在转码文件.b转码下一个分段(out External_Process external_Process)) {
                                 add日志($"开始转码：{external_Process.fi编码.FullName}");
                                 转码队列.ffmpeg等待入队(external_Process);//有队列上限
                             }
-
-                            if (!dic_完成路径_等待合并.ContainsKey(videoTemp.lower完整路径_输入视频)) {
-                                lock (obj合并队列) {
-                                    dic_完成路径_等待合并.Add(videoTemp.lower完整路径_输入视频, videoTemp);
-                                }
+                            if (!dic_完成路径_等待合并.ContainsKey(roadmap.lower完整路径_输入视频)) {
+                                lock (obj合并队列) dic_完成路径_等待合并.Add(roadmap.lower完整路径_输入视频, roadmap);
                             }
                         }
                     } else {
@@ -394,6 +395,7 @@ namespace 破片压缩器 {
                         string str合并结果;
                         if (arr等待合并队列[i].b转码后混流( )) {//混流任务属于磁盘读写任务，理论上会和解流任务抢占资源。
                             str合并结果 = $"合并成功：{arr等待合并队列[i].str切片路径}\\{arr等待合并队列[i].str输出文件名}";
+                            arr等待合并队列[i].fx清理存编终止切片( );//查找意外终止的任务碎片，合并成功后删除之
                         } else {
                             str合并结果 = $"合并失败！{arr等待合并队列[i].str切片路径}";
                         }
@@ -429,30 +431,32 @@ namespace 破片压缩器 {
         void fn初始信息( ) {
             while (true) {
                 try { autoReset初始信息.WaitOne( ); } catch { }
-                try { Thread.Sleep(3333); } catch { }
-                
-                this.Invoke(new Action(( ) => timer刷新编码输出.Stop( )));
-                while (转码队列.Get独立进程输出(out string info)) {
-                    if (转码队列.b有任务 && 转码队列.Has汇总输出信息(out string str编码速度)) {
-                        info += "\r\n\r\n" + str编码速度;
+                if (转码队列.b有任务) {//有任务时不显示扫描、切片、转音轨等日志。
+                    Invoke(new Action(( ) => timer刷新编码输出.Start( )));
+                    try { Thread.Sleep(999); } catch { }
+                } else {
+                    Invoke(new Action(( ) => timer刷新编码输出.Stop( )));
+                    try { Thread.Sleep(3333); } catch { }
+                    while (转码队列.Get独立进程输出(out string info)) {
+                        if (转码队列.b有任务 && 转码队列.Has汇总输出信息(out string str编码速度)) {
+                            info += "\r\n\r\n" + str编码速度;
+                        }
+                        if (info.Length > 0) {
+                            textBox日志.Invoke(new Action(( ) => {
+                                textBox日志.Text = info;
+                                textBox日志.SelectionStart = textBox日志.TextLength - 1;
+                                textBox日志.ScrollToCaret( );
+                            }));
+                        }
+                        try { autoReset初始信息.WaitOne(3333); } catch { }
                     }
-                    if (info.Length > 0) {
-                        textBox日志.Invoke(new Action(( ) => {
-                            textBox日志.Text = info;
-                            textBox日志.SelectionStart = textBox日志.TextLength - 1;
-                            textBox日志.ScrollToCaret( );
-                        }));
-                    }
-                    try { autoReset初始信息.WaitOne(3333); } catch { }
                 }
-                if (转码队列.b有任务)
-                    this.Invoke(new Action(( ) => timer刷新编码输出.Start( )));
             }
         }
 
-        void fn刷新输出( ) {
+        void fn刷新输出( ) {//编码函数可触发刷新日志。
             while (true) {
-                try { autoReset刷新输出.WaitOne( ); } catch { }
+                try { autoReset刷新输出.WaitOne( ); } catch { }//填入毫秒可完全代替时钟。
                 try { Thread.Sleep(999); } catch { }
                 if (转码队列.Has汇总输出信息(out string str编码速度)) {
                     textBox日志.Invoke(new Action(( ) => textBox日志.Text = str编码速度));
@@ -774,7 +778,7 @@ namespace 破片压缩器 {
                     if (转码队列.b有任务 && 转码队列.Has汇总输出信息(out string str编码速度)) {
                         textBox日志.Text = str编码速度;
                     }
-                    
+
                 } else {
                     if (Video_Roadmap.b查找可执行文件(out string log, out string txt)) {
                         button刷新.Text = "刷新(&R)";
@@ -837,24 +841,38 @@ namespace 破片压缩器 {
             checkBox_硬字幕.Checked = false;
             checkBox_硬字幕.Visible = false;
             checkBox编码后删除切片.Visible = true;
-
-            if (SelectedIndex == 0) {
-                i切片间隔秒 = Settings.sec_gop * 6;
-                Settings.b扫描场景 = true;
-                numericUpDown_分割最小秒.Visible = numericUpDown检测镜头.Visible = true;
-            } else if (SelectedIndex == 8) {
-                i切片间隔秒 = Settings.sec_gop * 3;
+            if (SelectedIndex == 8) {
+                i切分间隔秒 = Settings.sec_gop * 3;
                 Settings.b无缓转码 = Settings.b扫描场景 = true;
                 checkBox_硬字幕.Visible = true;
                 checkBox编码后删除切片.Visible = false;
-                numericUpDown_分割最小秒.Visible = numericUpDown检测镜头.Visible = true;
-
-            } else if (SelectedIndex == 9) {
+                numericUpDown_分割最小秒.Visible = true;
+                numericUpDown检测镜头.Visible = true;
+            } else if (SelectedIndex == 0) {
+                i切分间隔秒 = Settings.sec_gop * 6;
+                Settings.b扫描场景 = true;
+                numericUpDown_分割最小秒.Visible = true;
+                numericUpDown检测镜头.Visible = true;
+            } else if (SelectedIndex >= 9 && SelectedIndex <= 15) {
                 checkBox_硬字幕.Visible = true;
-                checkBox编码后删除切片.Visible = numericUpDown_分割最小秒.Visible = numericUpDown检测镜头.Visible = false;
-                i切片间隔秒 = Settings.sec_gop * 6;
+                checkBox编码后删除切片.Checked = false;
+                checkBox编码后删除切片.Visible = false;
+                numericUpDown_分割最小秒.Visible = true;
+                numericUpDown检测镜头.Visible = false;
+
                 Settings.b无缓转码 = true;
                 Settings.b扫描场景 = false;
+
+                if (SelectedIndex == 15) {
+                    numericUpDown_分割最小秒.Value = i切分间隔秒 = 1;
+                } else {
+                    i切分间隔秒 = Settings.sec_gop * 6;
+                    if (SelectedIndex == 10) i切分间隔秒 = Settings.sec_gop * 12;
+                    else if (SelectedIndex == 11) i切分间隔秒 = Settings.sec_gop * 36;
+                    else if (SelectedIndex == 12) i切分间隔秒 = Settings.sec_gop * 60;
+                    else if (SelectedIndex == 13) i切分间隔秒 = Settings.sec_gop * 120;
+                    else if (SelectedIndex == 14) i切分间隔秒 = Settings.sec_gop * 180;
+                }
             } else {
                 Settings.b扫描场景 = false;
                 numericUpDown_分割最小秒.Visible = numericUpDown检测镜头.Visible = false;
@@ -869,14 +887,14 @@ namespace 破片压缩器 {
                 以间隔10分钟左右分割
                  */
                 switch (SelectedIndex) {
-                    case 1: i切片间隔秒 = 5; return;
-                    case 2: i切片间隔秒 = 10; return;
-                    case 3: i切片间隔秒 = 30; return;
-                    case 4: i切片间隔秒 = 60; return;
-                    case 5: i切片间隔秒 = 180; return;
-                    case 6: i切片间隔秒 = 300; return;
-                    case 7: i切片间隔秒 = 600; return;
-                    default: i切片间隔秒 = Settings.sec_gop; return;
+                    case 1: i切分间隔秒 = 5; return;
+                    case 2: i切分间隔秒 = 10; return;
+                    case 3: i切分间隔秒 = 30; return;
+                    case 4: i切分间隔秒 = 60; return;
+                    case 5: i切分间隔秒 = 180; return;
+                    case 6: i切分间隔秒 = 300; return;
+                    case 7: i切分间隔秒 = 600; return;
+                    default: i切分间隔秒 = Settings.sec_gop; return;
                 }
             }
         }
@@ -1040,6 +1058,15 @@ namespace 破片压缩器 {
             }
         }
 
+        bool mctf上次 = true;
+        private void comboBox预设_SelectedIndexChanged(object sender, EventArgs e) {
+            bool set_mctf = mctf上次;
+            if (libEnc选中.dic_选择_预设.TryGetValue(comboBox预设.Text, out LibEnc.预设 enc预设)) {
+                set_mctf = enc预设.b运动补偿时域滤波;
+            }
+            if (mctf上次 != set_mctf) checkBox_磨皮.Visible = trackBar_降噪量.Visible = mctf上次 = set_mctf;
+        }
+
         private void numericUpDown_Workers_ValueChanged(object sender, EventArgs e) {
             int workers = (int)numericUpDown_Workers.Value;
             if (转码队列.i多进程数量 > workers && workers > 0) {
@@ -1143,7 +1170,7 @@ namespace 破片压缩器 {
             }
 
             if (libEnc选中.Noise去除参数 == null) {
-                checkBox_磨皮.Visible  = false;
+                checkBox_磨皮.Visible = false;
                 if (video热乎的切片 == null && video正在转码文件 == null)
                     add日志(libEnc选中.get参数_编码器预设画质(libEnc选中.key显示预设, libEnc选中.b多线程优先, checkBox_DriftCRF.Checked, crf上次));
             } else {
@@ -1216,8 +1243,5 @@ namespace 破片压缩器 {
             thread初始信息.IsBackground = true;
             thread初始信息.Start( );
         }
-
-
-
     }
 }
