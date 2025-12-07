@@ -160,6 +160,8 @@ namespace 破片压缩器 {
                                 autoReset初始信息.Set( );
                             }//自动识别黑边任务还可以优化为任务并发。顺序任务逻辑较为简单，后续读取信息任务无需等待。读取信息时会查找已成功的文件夹，此文件夹包含剪裁信息。
 
+                            roadmap.fx查找可渲染同名硬字幕文件( );
+
                             if (roadmap.b无缓转码) {//有无缓转码.info文件时，代表未完成任务为无缓模式
                                 roadmap.b查找MKA音轨( );
                                 Task.Run(( ) => fn无缓参数(roadmap));
@@ -269,9 +271,8 @@ namespace 破片压缩器 {
                 }//由转码线程结束后加入合并队列
                 autoReset转码.Set( );
             } else {//未完成的暂不加入合并队列，减少合并线程重复判断
-
-                if (!dic_完成路径_等待合并.ContainsKey(roadmap.lower完整路径_输入视频)) {
-                    lock (obj合并队列) {
+                lock (obj合并队列) {
+                    if (!dic_完成路径_等待合并.ContainsKey(roadmap.lower完整路径_输入视频)) {
                         dic_完成路径_等待合并.Add(roadmap.lower完整路径_输入视频, roadmap);
                     }
                     autoReset合并.Set( );
@@ -304,11 +305,7 @@ namespace 破片压缩器 {
                         add日志($"转码音轨：{video正在转码文件.strMKA路径}");
                     }
 
-                    while (转码队列.i多进程数量 == 0) {
-                        try { autoReset转码.WaitOne( ); } catch { }
-                        if (is缓存低) autoReset切片.Set( );
-                    }//存储机设置为0任务时，无限等待，编码交给外部算力节点。
-
+                    while (转码队列.i多进程数量 == 0) try { autoReset转码.WaitOne( ); } catch { }
                     this.Invoke(new Action(( ) => timer刷新编码输出.Start( )));//要委托UI线程启动计时器才能正确启动。
 
                     if (roadmap.b无缓转码) {
@@ -317,16 +314,24 @@ namespace 破片压缩器 {
                                 add日志($"开始转码：{external_Process.fi编码.FullName}");
                                 转码队列.ffmpeg等待入队(external_Process);//有队列上限
                             }
-                            if (!dic_完成路径_等待合并.ContainsKey(roadmap.lower完整路径_输入视频)) {
-                                lock (obj合并队列) dic_完成路径_等待合并.Add(roadmap.lower完整路径_输入视频, roadmap);
+                            lock (obj合并队列) {
+                                if (!dic_完成路径_等待合并.ContainsKey(roadmap.lower完整路径_输入视频)) {
+                                    dic_完成路径_等待合并.Add(roadmap.lower完整路径_输入视频, roadmap);
+                                }
                             }
                         }
                     } else {
                         while (video正在转码文件.b协同切片尝试回调( )) {
-                            while (video正在转码文件.b转码下一个切片(out External_Process external_Process)) {
-                                add日志($"开始转码：{external_Process.fi源.FullName}");
-                                转码队列.ffmpeg等待入队(external_Process);//有队列上限
-                                if (is缓存低) autoReset切片.Set( );
+                            for (bool hasNext = true; hasNext;) {
+                                while (!转码队列.b允许入队) {
+                                    try { 转码队列.autoReset入队.WaitOne( ); } catch { }//先等待，再入队，多机协同转码时避免空占文件等待入队
+                                    if (is缓存低) autoReset切片.Set( );
+                                }
+                                if (hasNext = video正在转码文件.b转码下一个切片(out External_Process external_Process)) {
+                                    add日志($"开始转码：{external_Process.fi源.FullName}");
+                                    转码队列.ffmpeg直接入队(external_Process);//没有队列上限
+
+                                }
                             }
                         }
                     }
@@ -359,9 +364,12 @@ namespace 破片压缩器 {
                             if (node.b准备协同任务(out string tips)) {
                                 str正在转码文件夹 = node.di切片文件夹.FullName;
                                 do {
-                                    while (node.b转码下一个切片(out External_Process external_Process)) {
-                                        add日志($"开始转码：{external_Process.fi编码.FullName}");
-                                        转码队列.ffmpeg等待入队(external_Process);//有队列上限
+                                    for (bool hasNext = true; hasNext;) {
+                                        while (!转码队列.b允许入队) try { 转码队列.autoReset入队.WaitOne( ); } catch { }//先等待，再入队，多机协同转码时避免空占文件等待入队
+                                        if (hasNext = node.b转码下一个切片(out External_Process external_Process)) {
+                                            add日志($"开始转码：{external_Process.fi编码.FullName}");
+                                            转码队列.ffmpeg直接入队(external_Process);//没有队列上限
+                                        }
                                     }
                                 } while (node.b未处理切片加入队列( ));
                             } else {
@@ -839,12 +847,13 @@ namespace 破片压缩器 {
             Settings.b无缓转码 = false;
 
             checkBox_硬字幕.Checked = false;
-            checkBox_硬字幕.Visible = false;
+            //checkBox_硬字幕.Visible = false;
             checkBox编码后删除切片.Visible = true;
+            Settings.sec_gop = (int)numericUpDown_GOP.Value;
             if (SelectedIndex == 8) {
                 i切分间隔秒 = Settings.sec_gop * 3;
                 Settings.b无缓转码 = Settings.b扫描场景 = true;
-                checkBox_硬字幕.Visible = true;
+                //checkBox_硬字幕.Visible = true;
                 checkBox编码后删除切片.Visible = false;
                 numericUpDown_分割最小秒.Visible = true;
                 numericUpDown检测镜头.Visible = true;
@@ -854,7 +863,7 @@ namespace 破片压缩器 {
                 numericUpDown_分割最小秒.Visible = true;
                 numericUpDown检测镜头.Visible = true;
             } else if (SelectedIndex >= 9 && SelectedIndex <= 15) {
-                checkBox_硬字幕.Visible = true;
+                //checkBox_硬字幕.Visible = true;
                 checkBox编码后删除切片.Checked = false;
                 checkBox编码后删除切片.Visible = false;
                 numericUpDown_分割最小秒.Visible = true;
@@ -1067,6 +1076,10 @@ namespace 破片压缩器 {
             if (mctf上次 != set_mctf) checkBox_磨皮.Visible = trackBar_降噪量.Visible = mctf上次 = set_mctf;
         }
 
+        private void checkBox_硬字幕_CheckedChanged(object sender, EventArgs e) {
+            checkBox_硬字幕.ForeColor = checkBox_硬字幕.Checked ? Color.Red : Color.Black;
+        }
+
         private void numericUpDown_Workers_ValueChanged(object sender, EventArgs e) {
             int workers = (int)numericUpDown_Workers.Value;
             if (转码队列.i多进程数量 > workers && workers > 0) {
@@ -1222,6 +1235,7 @@ namespace 破片压缩器 {
                 add日志("刷新输出信息间隔调整为一分钟");
         }
         private void Form破片压缩_Load(object sender, EventArgs e) {
+
             CPUNum( );
             //Extract_EXE.resources_to_exe( );
             comboBox_lib.SelectedIndex = 0;
